@@ -171,21 +171,9 @@ export function addSelectedOption(
     priceDelta: number;
   }
 ): DraftOrder {
-  const filtered = draft.selectedOptions.filter(
-    (opt) => opt.modifierGroupId !== payload.modifierGroupId
-  );
-
   return {
     ...draft,
-    selectedOptions: [...filtered, payload],
-    currentGroupIndex: draft.currentGroupIndex + 1,
-  };
-}
-
-export function skipCurrentGroup(draft: DraftOrder): DraftOrder {
-  return {
-    ...draft,
-    currentGroupIndex: draft.currentGroupIndex + 1,
+    selectedOptions: [...draft.selectedOptions, payload],
   };
 }
 
