@@ -17,8 +17,11 @@ export default function OrderActions({
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
 
-  async function updateOrder(body: any) {
-    await fetch(`/api/admin/orders/${orderNumber}`, {
+  async function updateOrder(body: {
+    status?: "PENDING" | "PREPARING" | "COMPLETED";
+    paymentStatus?: "UNPAID" | "PAID";
+  }) {
+    const res = await fetch(`/api/admin/orders/${orderNumber}`, {
       method: "PATCH",
       headers: {
         "Content-Type": "application/json",
@@ -26,50 +29,83 @@ export default function OrderActions({
       body: JSON.stringify(body),
     });
 
+    if (!res.ok) {
+      const data = await res.json().catch(() => null);
+      alert(data?.error ?? "Failed to update order");
+      return;
+    }
+
     startTransition(() => {
       router.refresh();
     });
   }
 
   return (
-    <div style={{ display: "flex", gap: "8px", marginTop: "8px" }}>
-      {/* Preparing */}
+    <div
+      style={{
+        display: "flex",
+        flexWrap: "wrap",
+        gap: "8px",
+        marginTop: "12px",
+      }}
+    >
       {status === "PENDING" && (
         <button
           onClick={() => updateOrder({ status: "PREPARING" })}
           disabled={isPending}
+          style={{
+            padding: "10px 14px",
+            borderRadius: "8px",
+            border: "1px solid #ccc",
+            cursor: "pointer",
+          }}
         >
           🔥 Start Preparing
         </button>
       )}
 
-      {/* Completed */}
       {status !== "COMPLETED" && (
         <button
           onClick={() => updateOrder({ status: "COMPLETED" })}
           disabled={isPending}
+          style={{
+            padding: "10px 14px",
+            borderRadius: "8px",
+            border: "1px solid #ccc",
+            cursor: "pointer",
+          }}
         >
           ✅ Completed
         </button>
       )}
 
-      {/* Paid */}
       {paymentStatus === "UNPAID" && (
         <button
           onClick={() => updateOrder({ paymentStatus: "PAID" })}
           disabled={isPending}
+          style={{
+            padding: "10px 14px",
+            borderRadius: "8px",
+            border: "1px solid #ccc",
+            cursor: "pointer",
+          }}
         >
           💰 Mark Paid
         </button>
       )}
 
-      {/* Unpaid (optional) */}
       {paymentStatus === "PAID" && (
         <button
           onClick={() => updateOrder({ paymentStatus: "UNPAID" })}
           disabled={isPending}
+          style={{
+            padding: "10px 14px",
+            borderRadius: "8px",
+            border: "1px solid #ccc",
+            cursor: "pointer",
+          }}
         >
-          ↩️ Unpaid
+          ↩️ Mark Unpaid
         </button>
       )}
     </div>

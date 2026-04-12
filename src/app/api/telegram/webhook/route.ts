@@ -281,84 +281,110 @@ export async function POST(req: Request) {
     }
 
     if (data === "SUBMIT_ORDER") {
-      const session = await getBotSession(telegramUserId);
-      const draft = getDraftOrder(session) as any;
+  const session = await getBotSession(telegramUserId);
+  const draft = getDraftOrder(session) as any;
 
-      if (!draft || !draft.quantity) {
-        await sendMessage(chatId, "Invalid order.");
-        return NextResponse.json({ ok: true });
-      }
+  if (!draft || !draft.quantity) {
+    const staffUser = await prisma.staffUser.findUnique({
+      where: { telegramUserId },
+    });
 
-      const item = await getMenuItemWithModifiers(draft.menuItemId);
-
-      if (!item) {
-        await sendMessage(chatId, "Item not found.");
-        return NextResponse.json({ ok: true });
-      }
-
-      const staffUser = await prisma.staffUser.upsert({
-        where: { telegramUserId },
-        update: {
-          firstName: callbackQuery.from.first_name ?? "Staff",
-          lastName: callbackQuery.from.last_name ?? null,
-          username: callbackQuery.from.username ?? null,
-          isActive: true,
-        },
-        create: {
-          telegramUserId,
-          firstName: callbackQuery.from.first_name ?? "Staff",
-          lastName: callbackQuery.from.last_name ?? null,
-          username: callbackQuery.from.username ?? null,
-          isActive: true,
-        },
-      });
-
-      const basePrice = item.price;
-
-      const { total } = calculateTotal(
-        basePrice,
-        draft.selectedOptions,
-        draft.quantity
-      );
-
-      const order = await prisma.order.create({
-        data: {
-          orderNumber: `ORD-${Date.now()}`,
+    if (staffUser) {
+      const recentOrder = await prisma.order.findFirst({
+        where: {
           staffUserId: staffUser.id,
-          subtotalAmount: total,
-          totalAmount: total,
-          status: "PENDING",
-          paymentStatus: "UNPAID",
-          items: {
-            create: [
-              {
-                menuItemId: item.id,
-                menuItemNameSnapshot: item.name,
-                unitPriceSnapshot: basePrice,
-                quantity: draft.quantity,
-                lineTotal: total,
-                modifiers: {
-                  create: draft.selectedOptions.map((opt: any) => ({
-                    modifierGroupNameSnapshot: opt.modifierGroupName,
-                    modifierOptionNameSnapshot: opt.modifierOptionName,
-                    priceDeltaSnapshot: opt.priceDelta,
-                  })),
-                },
-              },
-            ],
+          createdAt: {
+            gte: new Date(Date.now() - 2 * 60 * 1000),
           },
         },
+        orderBy: {
+          createdAt: "desc",
+        },
       });
 
-      await clearBotSession(telegramUserId);
-
-      await sendMessage(
-        chatId,
-        `✅ Order submitted!\nOrder #: ${order.orderNumber}\nTotal: ₦${total.toLocaleString()}`
-      );
-
-      return NextResponse.json({ ok: true });
+      if (recentOrder) {
+        await sendMessage(
+          chatId,
+          `✅ Order already submitted.\nOrder #: ${recentOrder.orderNumber}\nTotal: ₦${recentOrder.totalAmount.toLocaleString()}`
+        );
+        return NextResponse.json({ ok: true });
+      }
     }
+
+    await sendMessage(chatId, "No active order draft. Tap New Order to start again.");
+    return NextResponse.json({ ok: true });
+  }
+
+  const item = await getMenuItemWithModifiers(draft.menuItemId);
+
+  if (!item) {
+    await sendMessage(chatId, "Item not found.");
+    return NextResponse.json({ ok: true });
+  }
+
+  const staffUser = await prisma.staffUser.upsert({
+    where: { telegramUserId },
+    update: {
+      firstName: callbackQuery.from.first_name ?? "Staff",
+      lastName: callbackQuery.from.last_name ?? null,
+      username: callbackQuery.from.username ?? null,
+      isActive: true,
+    },
+    create: {
+      telegramUserId,
+      firstName: callbackQuery.from.first_name ?? "Staff",
+      lastName: callbackQuery.from.last_name ?? null,
+      username: callbackQuery.from.username ?? null,
+      isActive: true,
+    },
+  });
+
+  const basePrice = item.price;
+
+  const { total } = calculateTotal(
+    basePrice,
+    draft.selectedOptions,
+    draft.quantity
+  );
+
+  const order = await prisma.order.create({
+    data: {
+      orderNumber: `ORD-${Date.now()}`,
+      staffUserId: staffUser.id,
+      subtotalAmount: total,
+      totalAmount: total,
+      status: "PENDING",
+      paymentStatus: "UNPAID",
+      items: {
+        create: [
+          {
+            menuItemId: item.id,
+            menuItemNameSnapshot: item.name,
+            unitPriceSnapshot: basePrice,
+            quantity: draft.quantity,
+            lineTotal: total,
+            modifiers: {
+              create: draft.selectedOptions.map((opt: any) => ({
+                modifierGroupNameSnapshot: opt.modifierGroupName,
+                modifierOptionNameSnapshot: opt.modifierOptionName,
+                priceDeltaSnapshot: opt.priceDelta,
+              })),
+            },
+          },
+        ],
+      },
+    },
+  });
+
+  await clearBotSession(telegramUserId);
+
+  await sendMessage(
+    chatId,
+    `✅ Order submitted!\nOrder #: ${order.orderNumber}\nTotal: ₦${total.toLocaleString()}`
+  );
+
+  return NextResponse.json({ ok: true });
+}
   }
 
   return NextResponse.json({ ok: true });
