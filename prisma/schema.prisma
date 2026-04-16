@@ -64,9 +64,15 @@ model ModifierGroup {
   name          String
   selectionType ModifierSelectionType
   isRequired    Boolean               @default(false)
-  sortOrder     Int                   @default(0)
-  createdAt     DateTime              @default(now())
-  updatedAt     DateTime              @updatedAt
+
+  // New: explicit selection constraints for production menu logic
+  // Keep defaults safe so existing data/flow continue to work
+  minSelect Int @default(0)
+  maxSelect Int @default(1)
+
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   options   ModifierOption[]
   menuItems MenuItemModifierGroup[]
@@ -82,7 +88,8 @@ model ModifierOption {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
-  modifierGroup ModifierGroup @relation(fields: [modifierGroupId], references: [id], onDelete: Cascade)
+  modifierGroup      ModifierGroup       @relation(fields: [modifierGroupId], references: [id], onDelete: Cascade)
+  orderItemModifiers OrderItemModifier[]
 
   @@index([modifierGroupId])
 }
@@ -139,15 +146,21 @@ model OrderItem {
 }
 
 model OrderItemModifier {
-  id                         String @id @default(cuid())
+  id                         String  @id @default(cuid())
   orderItemId                String
+  modifierOptionId           String?
   modifierGroupNameSnapshot  String
   modifierOptionNameSnapshot String
   priceDeltaSnapshot         Int
 
-  orderItem OrderItem @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+  // New: counted selections, e.g. assorted x2
+  quantity Int @default(1)
+
+  orderItem      OrderItem       @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+  modifierOption ModifierOption? @relation(fields: [modifierOptionId], references: [id], onDelete: SetNull)
 
   @@index([orderItemId])
+  @@index([modifierOptionId])
 }
 
 model BotSession {

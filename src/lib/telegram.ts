@@ -8,11 +8,7 @@ if (!BOT_TOKEN) {
 
 const BASE_URL = `https://api.telegram.org/bot${BOT_TOKEN}`;
 
-export async function sendMessage(
-  chatId: number,
-  text: string,
-  options?: any
-) {
+export async function sendMessage(chatId: number, text: string, options?: any) {
   const res = await fetch(`${BASE_URL}/sendMessage`, {
     method: "POST",
     headers: {

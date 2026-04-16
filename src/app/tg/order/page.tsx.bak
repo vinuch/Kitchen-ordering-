@@ -1,0 +1,126 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { MenuList } from "./_components/menu-list";
+import { MenuItemDetailPanel } from "./_components/menu-item-detail";
+import type { MenuItemDetail, MenuListItem } from "./_components/types";
+
+export default function TelegramOrderPage() {
+  const [items, setItems] = useState<MenuListItem[]>([]);
+  const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
+  const [selectedItem, setSelectedItem] = useState<MenuItemDetail | null>(null);
+  const [loadingMenu, setLoadingMenu] = useState(true);
+  const [loadingItem, setLoadingItem] = useState(false);
+  const [menuError, setMenuError] = useState<string | null>(null);
+  const [itemError, setItemError] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function loadMenu() {
+      try {
+        setLoadingMenu(true);
+        setMenuError(null);
+
+        const res = await fetch("/api/menu");
+        const json = await res.json();
+
+        if (!res.ok || !json.ok) {
+          setMenuError(json.error ?? "Failed to load menu");
+          return;
+        }
+
+        setItems(json.items);
+
+        if (json.items.length > 0) {
+          setSelectedItemId(json.items[0].id);
+        }
+      } catch {
+        setMenuError("Failed to load menu");
+      } finally {
+        setLoadingMenu(false);
+      }
+    }
+
+    loadMenu();
+  }, []);
+
+  useEffect(() => {
+    if (!selectedItemId) {
+      setSelectedItem(null);
+      return;
+    }
+
+    async function loadItem() {
+      try {
+        setLoadingItem(true);
+        setItemError(null);
+
+        const res = await fetch(`/api/menu/${selectedItemId}`);
+        const json = await res.json();
+
+        if (!res.ok || !json.ok) {
+          setItemError(json.error ?? "Failed to load item");
+          setSelectedItem(null);
+          return;
+        }
+
+        setSelectedItem(json.item);
+      } catch {
+        setItemError("Failed to load item");
+        setSelectedItem(null);
+      } finally {
+        setLoadingItem(false);
+      }
+    }
+
+    loadItem();
+  }, [selectedItemId]);
+
+  return (
+    <main className="min-h-screen bg-[#f7f7f7] p-4">
+      <div className="mx-auto max-w-5xl">
+        <div className="mb-4">
+          <h1 className="text-2xl font-bold text-black">New Order</h1>
+          <p className="mt-1 text-sm text-gray-600">
+            Build an order inside Telegram.
+          </p>
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-[320px_minmax(0,1fr)]">
+          <section>
+            <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+              <div className="mb-3 text-sm font-semibold text-black">
+                Menu
+              </div>
+
+              {loadingMenu ? (
+                <div className="text-sm text-gray-600">Loading menu...</div>
+              ) : menuError ? (
+                <div className="text-sm text-red-600">{menuError}</div>
+              ) : (
+                <MenuList
+                  items={items}
+                  selectedItemId={selectedItemId}
+                  onSelect={setSelectedItemId}
+                />
+              )}
+            </div>
+          </section>
+
+          <section>
+            {loadingItem ? (
+              <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+                <div className="text-sm text-gray-600">Loading item...</div>
+              </div>
+            ) : itemError ? (
+              <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+                <div className="text-sm text-red-600">{itemError}</div>
+              </div>
+            ) : (
+              <MenuItemDetailPanel item={selectedItem} />
+            )}
+          </section>
+        </div>
+      </div>
+    </main>
+  );
+}

@@ -20,7 +20,7 @@ const allowedPaymentStatuses: PaymentStatus[] = [
 
 export async function PATCH(
   request: NextRequest,
-  context: { params: Promise<{ id: string }> }
+  context: { params: Promise<{ id: string }> },
 ) {
   try {
     const { id } = await context.params;
@@ -35,7 +35,7 @@ export async function PATCH(
       if (!allowedOrderStatuses.includes(body.status)) {
         return NextResponse.json(
           { error: "Invalid order status" },
-          { status: 400 }
+          { status: 400 },
         );
       }
       data.status = body.status;
@@ -45,7 +45,7 @@ export async function PATCH(
       if (!allowedPaymentStatuses.includes(body.paymentStatus)) {
         return NextResponse.json(
           { error: "Invalid payment status" },
-          { status: 400 }
+          { status: 400 },
         );
       }
       data.paymentStatus = body.paymentStatus;
@@ -54,7 +54,7 @@ export async function PATCH(
     if (Object.keys(data).length === 0) {
       return NextResponse.json(
         { error: "No valid fields provided" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -96,7 +96,7 @@ export async function PATCH(
         error: "Failed to update order",
         details: error instanceof Error ? error.message : "Unknown error",
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

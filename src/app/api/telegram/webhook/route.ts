@@ -5,6 +5,7 @@ import {
   addSelectedOption,
   buildMenuKeyboard,
   buildModifierKeyboard,
+  buildModifierPrompt,
   buildQuantityKeyboard,
   buildReviewKeyboard,
   buildReviewMessage,
@@ -15,6 +16,7 @@ import {
   getCurrentModifierGroup,
   getDraftOrder,
   getMenuItemWithModifiers,
+  getSelectedCountForGroup,
   skipCurrentGroup,
   upsertBotSession,
 } from "@/lib/order-flow";
@@ -42,11 +44,25 @@ export async function POST(req: Request) {
     if (text === "/start") {
       await sendMessage(chatId, "Welcome to Kitchen Bot 👨‍🍳", {
         reply_markup: {
-          inline_keyboard: [[{ text: "📝 New Order", callback_data: "NEW_ORDER" }]],
+          inline_keyboard: [
+            [
+              {
+                text: "📝 New Order",
+                web_app: {
+                  url: `${process.env.NEXT_PUBLIC_APP_URL}/tg/order`,
+                },
+              },
+            ],
+            [
+              {
+                text: "↩️ Fallback Inline Order",
+                callback_data: "NEW_ORDER",
+              },
+            ],
+          ],
         },
       });
     }
-
     return NextResponse.json({ ok: true });
   }
 
@@ -124,8 +140,8 @@ export async function POST(req: Request) {
         return NextResponse.json({ ok: true });
       }
 
-      await sendMessage(chatId, `Choose ${firstGroup.name}:`, {
-        reply_markup: buildModifierKeyboard(firstGroup, firstGroup.isRequired),
+      await sendMessage(chatId, buildModifierPrompt(firstGroup, draft), {
+        reply_markup: buildModifierKeyboard(firstGroup, draft),
       });
 
       return NextResponse.json({ ok: true });
@@ -138,7 +154,10 @@ export async function POST(req: Request) {
       const draft = getDraftOrder(session);
 
       if (!draft) {
-        await sendMessage(chatId, "No active order. Tap New Order to start again.");
+        await sendMessage(
+          chatId,
+          "No active order. Tap New Order to start again.",
+        );
         return NextResponse.json({ ok: true });
       }
 
@@ -153,12 +172,33 @@ export async function POST(req: Request) {
       const currentGroup = getCurrentModifierGroup(item, draft);
 
       if (!currentGroup || currentGroup.id !== modifierGroupId) {
-        await sendMessage(chatId, "That option is no longer valid. Start again.");
+        await sendMessage(
+          chatId,
+          "That option is no longer valid. Start again.",
+        );
         await clearBotSession(telegramUserId);
         return NextResponse.json({ ok: true });
       }
 
-      const selectedOption = currentGroup.options.find((opt) => opt.id === modifierOptionId);
+      const currentSelectedCount = getSelectedCountForGroup(
+        draft,
+        currentGroup.id,
+      );
+
+      if (currentSelectedCount >= currentGroup.maxSelect) {
+        await sendMessage(
+          chatId,
+          `You've already selected the maximum for ${currentGroup.name}. Tap Done to continue.`,
+          {
+            reply_markup: buildModifierKeyboard(currentGroup, draft),
+          },
+        );
+        return NextResponse.json({ ok: true });
+      }
+
+      const selectedOption = currentGroup.options.find(
+        (opt) => opt.id === modifierOptionId,
+      );
 
       if (!selectedOption) {
         await sendMessage(chatId, "Option not found.");
@@ -173,17 +213,40 @@ export async function POST(req: Request) {
         priceDelta: selectedOption.priceDelta,
       });
 
-      const nextGroup = getCurrentModifierGroup(item, nextDraft);
+      const nextSelectedCount = getSelectedCountForGroup(
+        nextDraft,
+        currentGroup.id,
+      );
 
-      if (!nextGroup) {
+      if (nextSelectedCount >= currentGroup.maxSelect) {
+        const advancedDraft = skipCurrentGroup(nextDraft);
+        const nextGroup = getCurrentModifierGroup(item, advancedDraft);
+
+        if (!nextGroup) {
+          await upsertBotSession(telegramUserId, {
+            state: "SELECTING_QUANTITY",
+            draftOrderJson: advancedDraft,
+          });
+
+          await sendMessage(chatId, "Choose quantity:", {
+            reply_markup: buildQuantityKeyboard(),
+          });
+
+          return NextResponse.json({ ok: true });
+        }
+
         await upsertBotSession(telegramUserId, {
-          state: "SELECTING_QUANTITY",
-          draftOrderJson: nextDraft,
+          state: "SELECTING_MODIFIERS",
+          draftOrderJson: advancedDraft,
         });
 
-        await sendMessage(chatId, "Choose quantity:", {
-          reply_markup: buildQuantityKeyboard(),
-        });
+        await sendMessage(
+          chatId,
+          buildModifierPrompt(nextGroup, advancedDraft),
+          {
+            reply_markup: buildModifierKeyboard(nextGroup, advancedDraft),
+          },
+        );
 
         return NextResponse.json({ ok: true });
       }
@@ -193,19 +256,24 @@ export async function POST(req: Request) {
         draftOrderJson: nextDraft,
       });
 
-      await sendMessage(chatId, `Choose ${nextGroup.name}:`, {
-        reply_markup: buildModifierKeyboard(nextGroup, nextGroup.isRequired),
+      await sendMessage(chatId, buildModifierPrompt(currentGroup, nextDraft), {
+        reply_markup: buildModifierKeyboard(currentGroup, nextDraft),
       });
 
       return NextResponse.json({ ok: true });
     }
 
-    if (data.startsWith("SKIP_GROUP:")) {
+    if (data.startsWith("DONE_GROUP:")) {
+      const [, modifierGroupId] = data.split(":");
+
       const session = await getBotSession(telegramUserId);
       const draft = getDraftOrder(session);
 
       if (!draft) {
-        await sendMessage(chatId, "No active order. Tap New Order to start again.");
+        await sendMessage(
+          chatId,
+          "No active order. Tap New Order to start again.",
+        );
         return NextResponse.json({ ok: true });
       }
 
@@ -214,6 +282,30 @@ export async function POST(req: Request) {
       if (!item) {
         await sendMessage(chatId, "Selected menu item no longer exists.");
         await clearBotSession(telegramUserId);
+        return NextResponse.json({ ok: true });
+      }
+
+      const currentGroup = getCurrentModifierGroup(item, draft);
+
+      if (!currentGroup || currentGroup.id !== modifierGroupId) {
+        await sendMessage(
+          chatId,
+          "That group is no longer valid. Start again.",
+        );
+        await clearBotSession(telegramUserId);
+        return NextResponse.json({ ok: true });
+      }
+
+      const selectedCount = getSelectedCountForGroup(draft, currentGroup.id);
+
+      if (selectedCount < currentGroup.minSelect) {
+        await sendMessage(
+          chatId,
+          `Select at least ${currentGroup.minSelect} option(s) for ${currentGroup.name}.`,
+          {
+            reply_markup: buildModifierKeyboard(currentGroup, draft),
+          },
+        );
         return NextResponse.json({ ok: true });
       }
 
@@ -238,8 +330,82 @@ export async function POST(req: Request) {
         draftOrderJson: nextDraft,
       });
 
-      await sendMessage(chatId, `Choose ${nextGroup.name}:`, {
-        reply_markup: buildModifierKeyboard(nextGroup, nextGroup.isRequired),
+      await sendMessage(chatId, buildModifierPrompt(nextGroup, nextDraft), {
+        reply_markup: buildModifierKeyboard(nextGroup, nextDraft),
+      });
+
+      return NextResponse.json({ ok: true });
+    }
+
+    if (data.startsWith("SKIP_GROUP:")) {
+      const [, modifierGroupId] = data.split(":");
+
+      const session = await getBotSession(telegramUserId);
+      const draft = getDraftOrder(session);
+
+      if (!draft) {
+        await sendMessage(
+          chatId,
+          "No active order. Tap New Order to start again.",
+        );
+        return NextResponse.json({ ok: true });
+      }
+
+      const item = await getMenuItemWithModifiers(draft.menuItemId);
+
+      if (!item) {
+        await sendMessage(chatId, "Selected menu item no longer exists.");
+        await clearBotSession(telegramUserId);
+        return NextResponse.json({ ok: true });
+      }
+
+      const currentGroup = getCurrentModifierGroup(item, draft);
+
+      if (!currentGroup || currentGroup.id !== modifierGroupId) {
+        await sendMessage(
+          chatId,
+          "That group is no longer valid. Start again.",
+        );
+        await clearBotSession(telegramUserId);
+        return NextResponse.json({ ok: true });
+      }
+
+      const selectedCount = getSelectedCountForGroup(draft, currentGroup.id);
+
+      if (selectedCount < currentGroup.minSelect) {
+        await sendMessage(
+          chatId,
+          `Select at least ${currentGroup.minSelect} option(s) for ${currentGroup.name}.`,
+          {
+            reply_markup: buildModifierKeyboard(currentGroup, draft),
+          },
+        );
+        return NextResponse.json({ ok: true });
+      }
+
+      const nextDraft = skipCurrentGroup(draft);
+      const nextGroup = getCurrentModifierGroup(item, nextDraft);
+
+      if (!nextGroup) {
+        await upsertBotSession(telegramUserId, {
+          state: "SELECTING_QUANTITY",
+          draftOrderJson: nextDraft,
+        });
+
+        await sendMessage(chatId, "Choose quantity:", {
+          reply_markup: buildQuantityKeyboard(),
+        });
+
+        return NextResponse.json({ ok: true });
+      }
+
+      await upsertBotSession(telegramUserId, {
+        state: "SELECTING_MODIFIERS",
+        draftOrderJson: nextDraft,
+      });
+
+      await sendMessage(chatId, buildModifierPrompt(nextGroup, nextDraft), {
+        reply_markup: buildModifierKeyboard(nextGroup, nextDraft),
       });
 
       return NextResponse.json({ ok: true });
@@ -281,110 +447,129 @@ export async function POST(req: Request) {
     }
 
     if (data === "SUBMIT_ORDER") {
-  const session = await getBotSession(telegramUserId);
-  const draft = getDraftOrder(session) as any;
+      const session = await getBotSession(telegramUserId);
+      const draft = getDraftOrder(session) as any;
 
-  if (!draft || !draft.quantity) {
-    const staffUser = await prisma.staffUser.findUnique({
-      where: { telegramUserId },
-    });
+      if (!draft || !draft.quantity) {
+        const staffUser = await prisma.staffUser.findUnique({
+          where: { telegramUserId },
+        });
 
-    if (staffUser) {
-      const recentOrder = await prisma.order.findFirst({
-        where: {
-          staffUserId: staffUser.id,
-          createdAt: {
-            gte: new Date(Date.now() - 2 * 60 * 1000),
-          },
-        },
-        orderBy: {
-          createdAt: "desc",
-        },
-      });
+        if (staffUser) {
+          const recentOrder = await prisma.order.findFirst({
+            where: {
+              staffUserId: staffUser.id,
+              createdAt: {
+                gte: new Date(Date.now() - 2 * 60 * 1000),
+              },
+            },
+            orderBy: {
+              createdAt: "desc",
+            },
+          });
 
-      if (recentOrder) {
+          if (recentOrder) {
+            await sendMessage(
+              chatId,
+              `✅ Order already submitted.\nOrder #: ${recentOrder.orderNumber}\nTotal: ₦${recentOrder.totalAmount.toLocaleString()}`,
+            );
+            return NextResponse.json({ ok: true });
+          }
+        }
+
         await sendMessage(
           chatId,
-          `✅ Order already submitted.\nOrder #: ${recentOrder.orderNumber}\nTotal: ₦${recentOrder.totalAmount.toLocaleString()}`
+          "No active order draft. Tap New Order to start again.",
         );
         return NextResponse.json({ ok: true });
       }
-    }
 
-    await sendMessage(chatId, "No active order draft. Tap New Order to start again.");
-    return NextResponse.json({ ok: true });
-  }
+      const item = await getMenuItemWithModifiers(draft.menuItemId);
 
-  const item = await getMenuItemWithModifiers(draft.menuItemId);
+      if (!item) {
+        await sendMessage(chatId, "Item not found.");
+        return NextResponse.json({ ok: true });
+      }
 
-  if (!item) {
-    await sendMessage(chatId, "Item not found.");
-    return NextResponse.json({ ok: true });
-  }
+      const staffUser = await prisma.staffUser.upsert({
+        where: { telegramUserId },
+        update: {
+          firstName: callbackQuery.from.first_name ?? "Staff",
+          lastName: callbackQuery.from.last_name ?? null,
+          username: callbackQuery.from.username ?? null,
+          isActive: true,
+        },
+        create: {
+          telegramUserId,
+          firstName: callbackQuery.from.first_name ?? "Staff",
+          lastName: callbackQuery.from.last_name ?? null,
+          username: callbackQuery.from.username ?? null,
+          isActive: true,
+        },
+      });
 
-  const staffUser = await prisma.staffUser.upsert({
-    where: { telegramUserId },
-    update: {
-      firstName: callbackQuery.from.first_name ?? "Staff",
-      lastName: callbackQuery.from.last_name ?? null,
-      username: callbackQuery.from.username ?? null,
-      isActive: true,
-    },
-    create: {
-      telegramUserId,
-      firstName: callbackQuery.from.first_name ?? "Staff",
-      lastName: callbackQuery.from.last_name ?? null,
-      username: callbackQuery.from.username ?? null,
-      isActive: true,
-    },
-  });
+      const basePrice = item.price;
 
-  const basePrice = item.price;
+      const { total } = calculateTotal(
+        basePrice,
+        draft.selectedOptions,
+        draft.quantity,
+      );
 
-  const { total } = calculateTotal(
-    basePrice,
-    draft.selectedOptions,
-    draft.quantity
-  );
+      const order = await prisma.order.create({
+        data: {
+          orderNumber: `ORD-${Date.now()}`,
+          staffUserId: staffUser.id,
+          subtotalAmount: total,
+          totalAmount: total,
+          status: "PENDING",
+          paymentStatus: "UNPAID",
+          items: {
+            create: [
+              {
+                menuItemId: item.id,
+                menuItemNameSnapshot: item.name,
+                unitPriceSnapshot: basePrice,
+                quantity: draft.quantity,
+                lineTotal: total,
+                modifiers: {
+                  create: (() => {
+                    const grouped: Record<string, any> = {};
 
-  const order = await prisma.order.create({
-    data: {
-      orderNumber: `ORD-${Date.now()}`,
-      staffUserId: staffUser.id,
-      subtotalAmount: total,
-      totalAmount: total,
-      status: "PENDING",
-      paymentStatus: "UNPAID",
-      items: {
-        create: [
-          {
-            menuItemId: item.id,
-            menuItemNameSnapshot: item.name,
-            unitPriceSnapshot: basePrice,
-            quantity: draft.quantity,
-            lineTotal: total,
-            modifiers: {
-              create: draft.selectedOptions.map((opt: any) => ({
-                modifierGroupNameSnapshot: opt.modifierGroupName,
-                modifierOptionNameSnapshot: opt.modifierOptionName,
-                priceDeltaSnapshot: opt.priceDelta,
-              })),
-            },
+                    for (const opt of draft.selectedOptions) {
+                      const key = `${opt.modifierGroupName}::${opt.modifierOptionName}`;
+
+                      if (!grouped[key]) {
+                        grouped[key] = {
+                          modifierGroupNameSnapshot: opt.modifierGroupName,
+                          modifierOptionNameSnapshot: opt.modifierOptionName,
+                          priceDeltaSnapshot: opt.priceDelta,
+                          modifierOptionId: opt.modifierOptionId ?? null,
+                          quantity: 0,
+                        };
+                      }
+
+                      grouped[key].quantity += 1;
+                    }
+
+                    return Object.values(grouped);
+                  })(),
+                },
+              },
+            ],
           },
-        ],
-      },
-    },
-  });
+        },
+      });
 
-  await clearBotSession(telegramUserId);
+      await clearBotSession(telegramUserId);
 
-  await sendMessage(
-    chatId,
-    `✅ Order submitted!\nOrder #: ${order.orderNumber}\nTotal: ₦${total.toLocaleString()}`
-  );
+      await sendMessage(
+        chatId,
+        `✅ Order submitted!\nOrder #: ${order.orderNumber}\nTotal: ₦${total.toLocaleString()}`,
+      );
 
-  return NextResponse.json({ ok: true });
-}
+      return NextResponse.json({ ok: true });
+    }
   }
 
   return NextResponse.json({ ok: true });

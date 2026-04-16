@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { Prisma } from "@prisma/client";
 
 type DraftOrder = {
   menuItemId: string;
@@ -10,6 +11,19 @@ type DraftOrder = {
     priceDelta: number;
   }>;
   currentGroupIndex: number;
+};
+
+type ModifierGroupForFlow = {
+  id: string;
+  name: string;
+  isRequired: boolean;
+  minSelect: number;
+  maxSelect: number;
+  options: Array<{
+    id: string;
+    name: string;
+    priceDelta: number;
+  }>;
 };
 
 export async function buildMenuKeyboard() {
@@ -64,29 +78,79 @@ export async function getMenuItemWithModifiers(menuItemId: string) {
   });
 }
 
-export function buildModifierKeyboard(
-  group: {
-    id: string;
-    name: string;
-    options: Array<{
-      id: string;
-      name: string;
-      priceDelta: number;
-    }>;
-  },
-  isRequired: boolean
+export function getSelectedCountForGroup(
+  draft: DraftOrder,
+  modifierGroupId: string,
 ) {
-  const rows = group.options.map((opt) => [
+  return draft.selectedOptions.filter(
+    (opt) => opt.modifierGroupId === modifierGroupId,
+  ).length;
+}
+
+export function getSelectedCountForOption(
+  draft: DraftOrder,
+  modifierGroupId: string,
+  modifierOptionId: string,
+) {
+  return draft.selectedOptions.filter(
+    (opt) =>
+      opt.modifierGroupId === modifierGroupId &&
+      opt.modifierOptionId === modifierOptionId,
+  ).length;
+}
+
+export function buildModifierPrompt(
+  group: ModifierGroupForFlow,
+  draft: DraftOrder,
+) {
+  const selectedCount = getSelectedCountForGroup(draft, group.id);
+
+  let requirementText = "";
+  if (group.minSelect === group.maxSelect) {
+    requirementText = `Select exactly ${group.maxSelect}`;
+  } else if (group.minSelect > 0) {
+    requirementText = `Select ${group.minSelect}-${group.maxSelect}`;
+  } else {
+    requirementText = `Optional, up to ${group.maxSelect}`;
+  }
+
+  return `Choose ${group.name}:\nSelected: ${selectedCount}/${group.maxSelect}\n${requirementText}`;
+}
+
+export function buildModifierKeyboard(
+  group: ModifierGroupForFlow,
+  draft: DraftOrder,
+) {
+  const selectedCount = getSelectedCountForGroup(draft, group.id);
+
+  const rows = group.options.map((opt) => {
+    const optionCount = getSelectedCountForOption(draft, group.id, opt.id);
+
+    let text =
+      opt.priceDelta > 0
+        ? `${opt.name} +₦${opt.priceDelta.toLocaleString()}`
+        : opt.name;
+
+    if (optionCount > 0) {
+      text += ` ×${optionCount}`;
+    }
+
+    return [
+      {
+        text,
+        callback_data: `MOD:${group.id}:${opt.id}`,
+      },
+    ];
+  });
+
+  rows.push([
     {
-      text:
-        opt.priceDelta > 0
-          ? `${opt.name} +₦${opt.priceDelta.toLocaleString()}`
-          : opt.name,
-      callback_data: `MOD:${group.id}:${opt.id}`,
+      text: `✅ Done (${selectedCount}/${group.maxSelect})`,
+      callback_data: `DONE_GROUP:${group.id}`,
     },
   ]);
 
-  if (!isRequired) {
+  if (!group.isRequired && selectedCount === 0) {
     rows.push([{ text: "Skip", callback_data: `SKIP_GROUP:${group.id}` }]);
   }
 
@@ -114,23 +178,42 @@ export function buildQuantityKeyboard() {
   };
 }
 
+function toPrismaJson(
+  value: Record<string, unknown> | null | undefined
+): Prisma.InputJsonValue | Prisma.NullableJsonNullValueInput | undefined {
+  if (value === undefined) return undefined;
+  if (value === null) return Prisma.JsonNull;
+  return value as Prisma.InputJsonValue;
+}
+
 export async function upsertBotSession(
   telegramUserId: string,
   data: {
-    state?: "IDLE" | "SELECTING_ITEMS" | "SELECTING_MODIFIERS" | "SELECTING_QUANTITY" | "REVIEWING_ORDER";
-    draftOrderJson?: unknown;
+    state?:
+      | "IDLE"
+      | "SELECTING_ITEMS"
+      | "SELECTING_MODIFIERS"
+      | "SELECTING_QUANTITY"
+      | "REVIEWING_ORDER";
+    draftOrderJson?: Record<string, unknown> | null;
   }
 ) {
+  const prismaDraftOrderJson = toPrismaJson(data.draftOrderJson);
+
   return prisma.botSession.upsert({
     where: { telegramUserId },
     update: {
       ...(data.state ? { state: data.state } : {}),
-      ...(data.draftOrderJson !== undefined ? { draftOrderJson: data.draftOrderJson } : {}),
+      ...(prismaDraftOrderJson !== undefined
+        ? { draftOrderJson: prismaDraftOrderJson }
+        : {}),
     },
     create: {
       telegramUserId,
       state: data.state ?? "IDLE",
-      draftOrderJson: data.draftOrderJson ?? null,
+      ...(prismaDraftOrderJson !== undefined
+        ? { draftOrderJson: prismaDraftOrderJson }
+        : {}),
     },
   });
 }
@@ -156,7 +239,9 @@ export function createDraftOrder(menuItemId: string): DraftOrder {
   };
 }
 
-export function getDraftOrder(session: { draftOrderJson: unknown } | null): DraftOrder | null {
+export function getDraftOrder(
+  session: { draftOrderJson: unknown } | null,
+): DraftOrder | null {
   if (!session?.draftOrderJson) return null;
   return session.draftOrderJson as DraftOrder;
 }
@@ -169,7 +254,7 @@ export function addSelectedOption(
     modifierOptionId: string;
     modifierOptionName: string;
     priceDelta: number;
-  }
+  },
 ): DraftOrder {
   return {
     ...draft,
@@ -177,22 +262,31 @@ export function addSelectedOption(
   };
 }
 
+export function skipCurrentGroup(draft: DraftOrder): DraftOrder {
+  return {
+    ...draft,
+    currentGroupIndex: draft.currentGroupIndex + 1,
+  };
+}
+
 export function getCurrentModifierGroup(
   item: Awaited<ReturnType<typeof getMenuItemWithModifiers>>,
-  draft: DraftOrder
+  draft: DraftOrder,
 ) {
   if (!item) return null;
-  return item.menuModifierGroups[draft.currentGroupIndex]?.modifierGroup ?? null;
+  return (
+    item.menuModifierGroups[draft.currentGroupIndex]?.modifierGroup ?? null
+  );
 }
 
 export function calculateTotal(
   basePrice: number,
   selectedOptions: DraftOrder["selectedOptions"],
-  quantity: number
+  quantity: number,
 ) {
   const extrasTotal = selectedOptions.reduce(
     (sum, opt) => sum + opt.priceDelta,
-    0
+    0,
   );
 
   const unitTotal = basePrice + extrasTotal;
@@ -207,7 +301,7 @@ export function calculateTotal(
 export function buildReviewMessage(
   item: { name: string; price: number },
   draft: DraftOrder,
-  quantity: number
+  quantity: number,
 ) {
   let text = `🧾 <b>Order Summary</b>\n\n`;
   text += `${item.name}\n`;

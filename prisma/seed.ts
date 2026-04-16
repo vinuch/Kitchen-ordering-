@@ -32,13 +32,13 @@ async function main() {
         create: [
           { name: "Chicken", priceDelta: 0, sortOrder: 1 },
           { name: "Beef", priceDelta: 500, sortOrder: 2 },
-          { name: "Fish", priceDelta: 700, sortOrder: 3 }
-        ]
-      }
+          { name: "Fish", priceDelta: 700, sortOrder: 3 },
+        ],
+      },
     },
     include: {
-      options: true
-    }
+      options: true,
+    },
   });
 
   const extrasGroup = await prisma.modifierGroup.create({
@@ -52,13 +52,13 @@ async function main() {
           { name: "Extra Chicken", priceDelta: 1200, sortOrder: 1 },
           { name: "Extra Beef", priceDelta: 1500, sortOrder: 2 },
           { name: "Plantain", priceDelta: 800, sortOrder: 3 },
-          { name: "Salad", priceDelta: 600, sortOrder: 4 }
-        ]
-      }
+          { name: "Salad", priceDelta: 600, sortOrder: 4 },
+        ],
+      },
     },
     include: {
-      options: true
-    }
+      options: true,
+    },
   });
 
   const spiceGroup = await prisma.modifierGroup.create({
@@ -71,13 +71,13 @@ async function main() {
         create: [
           { name: "Mild", priceDelta: 0, sortOrder: 1 },
           { name: "Medium", priceDelta: 0, sortOrder: 2 },
-          { name: "Hot", priceDelta: 0, sortOrder: 3 }
-        ]
-      }
+          { name: "Hot", priceDelta: 0, sortOrder: 3 },
+        ],
+      },
     },
     include: {
-      options: true
-    }
+      options: true,
+    },
   });
 
   const jollofRice = await prisma.menuItem.create({
@@ -85,8 +85,8 @@ async function main() {
       name: "Jollof Rice",
       description: "Smoky jollof rice plate",
       price: 3500,
-      sortOrder: 1
-    }
+      sortOrder: 1,
+    },
   });
 
   const friedRice = await prisma.menuItem.create({
@@ -94,8 +94,8 @@ async function main() {
       name: "Fried Rice",
       description: "Fried rice plate",
       price: 3800,
-      sortOrder: 2
-    }
+      sortOrder: 2,
+    },
   });
 
   const shawarma = await prisma.menuItem.create({
@@ -103,8 +103,8 @@ async function main() {
       name: "Shawarma",
       description: "Wrap with filling and sauce",
       price: 4000,
-      sortOrder: 3
-    }
+      sortOrder: 3,
+    },
   });
 
   const chickenAndChips = await prisma.menuItem.create({
@@ -112,8 +112,8 @@ async function main() {
       name: "Chicken and Chips",
       description: "Chicken served with fries",
       price: 4500,
-      sortOrder: 4
-    }
+      sortOrder: 4,
+    },
   });
 
   const coke = await prisma.menuItem.create({
@@ -121,8 +121,8 @@ async function main() {
       name: "Coke",
       description: "Soft drink",
       price: 800,
-      sortOrder: 5
-    }
+      sortOrder: 5,
+    },
   });
 
   const water = await prisma.menuItem.create({
@@ -130,8 +130,8 @@ async function main() {
       name: "Water",
       description: "Bottle water",
       price: 500,
-      sortOrder: 6
-    }
+      sortOrder: 6,
+    },
   });
 
   await prisma.menuItemModifierGroup.createMany({
@@ -147,8 +147,8 @@ async function main() {
       { menuItemId: shawarma.id, modifierGroupId: spiceGroup.id },
 
       { menuItemId: chickenAndChips.id, modifierGroupId: extrasGroup.id },
-      { menuItemId: chickenAndChips.id, modifierGroupId: spiceGroup.id }
-    ]
+      { menuItemId: chickenAndChips.id, modifierGroupId: spiceGroup.id },
+    ],
   });
 
   const menuCount = await prisma.menuItem.count();
@@ -162,7 +162,7 @@ async function main() {
     optionCount,
     proteinGroup: proteinGroup.name,
     extrasGroup: extrasGroup.name,
-    spiceGroup: spiceGroup.name
+    spiceGroup: spiceGroup.name,
   });
 }
 

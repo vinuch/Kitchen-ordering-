@@ -4,10 +4,10 @@ import { prisma } from "@/lib/prisma";
 export async function GET() {
   const menuItems = await prisma.menuItem.findMany({
     where: {
-      isActive: true
+      isActive: true,
     },
     orderBy: {
-      sortOrder: "asc"
+      sortOrder: "asc",
     },
     include: {
       menuModifierGroups: {
@@ -16,22 +16,22 @@ export async function GET() {
             include: {
               options: {
                 where: {
-                  isActive: true
+                  isActive: true,
                 },
                 orderBy: {
-                  sortOrder: "asc"
-                }
-              }
-            }
-          }
-        }
-      }
-    }
+                  sortOrder: "asc",
+                },
+              },
+            },
+          },
+        },
+      },
+    },
   });
 
   return NextResponse.json({
     ok: true,
     count: menuItems.length,
-    menuItems
+    menuItems,
   });
 }

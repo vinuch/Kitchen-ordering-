@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import OrderActions from "../admin/OrderActions";
+import KitchenAutoRefresh from "@/components/kitchen-auto-refresh";
 
 export const revalidate = 0;
 
@@ -25,10 +26,7 @@ export default async function KitchenPage() {
         in: ["PENDING", "PREPARING"],
       },
     },
-    orderBy: [
-      { status: "asc" },
-      { createdAt: "asc" },
-    ],
+    orderBy: [{ status: "asc" }, { createdAt: "asc" }],
     include: {
       staffUser: true,
       items: {
@@ -47,6 +45,7 @@ export default async function KitchenPage() {
         padding: "24px",
       }}
     >
+      <KitchenAutoRefresh />
       <div
         style={{
           maxWidth: "1400px",
@@ -155,7 +154,9 @@ export default async function KitchenPage() {
                       }}
                     >
                       {order.staffUser.firstName}
-                      {order.staffUser.lastName ? ` ${order.staffUser.lastName}` : ""}
+                      {order.staffUser.lastName
+                        ? ` ${order.staffUser.lastName}`
+                        : ""}
                     </p>
                   </div>
 
@@ -188,7 +189,9 @@ export default async function KitchenPage() {
                         fontSize: "13px",
                         fontWeight: 700,
                         background:
-                          order.paymentStatus === "PAID" ? "#d4edda" : "#f8d7da",
+                          order.paymentStatus === "PAID"
+                            ? "#d4edda"
+                            : "#f8d7da",
                         color: "#222",
                       }}
                     >
