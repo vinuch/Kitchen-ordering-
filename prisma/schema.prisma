@@ -64,15 +64,11 @@ model ModifierGroup {
   name          String
   selectionType ModifierSelectionType
   isRequired    Boolean               @default(false)
-
-  // New: explicit selection constraints for production menu logic
-  // Keep defaults safe so existing data/flow continue to work
-  minSelect Int @default(0)
-  maxSelect Int @default(1)
-
-  sortOrder Int      @default(0)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  minSelect     Int                   @default(0)
+  maxSelect     Int                   @default(1)
+  sortOrder     Int                   @default(0)
+  createdAt     DateTime              @default(now())
+  updatedAt     DateTime              @updatedAt
 
   options   ModifierOption[]
   menuItems MenuItemModifierGroup[]
@@ -111,6 +107,7 @@ model Order {
   id             String        @id @default(cuid())
   orderNumber    String        @unique
   staffUserId    String
+  tableNumber    String?
   status         OrderStatus   @default(PENDING)
   paymentStatus  PaymentStatus @default(UNPAID)
   subtotalAmount Int
@@ -126,6 +123,7 @@ model Order {
   @@index([status])
   @@index([paymentStatus])
   @@index([staffUserId])
+  @@index([tableNumber])
 }
 
 model OrderItem {
@@ -152,9 +150,7 @@ model OrderItemModifier {
   modifierGroupNameSnapshot  String
   modifierOptionNameSnapshot String
   priceDeltaSnapshot         Int
-
-  // New: counted selections, e.g. assorted x2
-  quantity Int @default(1)
+  quantity                   Int     @default(1)
 
   orderItem      OrderItem       @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
   modifierOption ModifierOption? @relation(fields: [modifierOptionId], references: [id], onDelete: SetNull)

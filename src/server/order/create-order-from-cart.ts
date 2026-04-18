@@ -8,8 +8,23 @@ type CreateOrderFromCartInput = {
   lastName?: string | null;
   username?: string | null;
   notes?: string | null;
+  tableNumber?: string | null;
   lines: DraftOrderLineInput[];
 };
+
+function generateOrderNumber() {
+  const now = new Date();
+  const parts = [
+    now.getFullYear(),
+    String(now.getMonth() + 1).padStart(2, "0"),
+    String(now.getDate()).padStart(2, "0"),
+    String(now.getHours()).padStart(2, "0"),
+    String(now.getMinutes()).padStart(2, "0"),
+    String(now.getSeconds()).padStart(2, "0"),
+  ];
+
+  return `ORD-${parts.join("")}`;
+}
 
 export async function createOrderFromCart(input: CreateOrderFromCartInput) {
   if (!input.lines.length) {
@@ -17,17 +32,17 @@ export async function createOrderFromCart(input: CreateOrderFromCartInput) {
   }
 
   const pricedLines = await Promise.all(
-    input.lines.map((line) => priceDraftOrder(line)),
+    input.lines.map((line) => priceDraftOrder(line))
   );
 
   const subtotalAmount = pricedLines.reduce(
     (sum, priced) => sum + priced.subtotal,
-    0,
+    0
   );
 
   const totalAmount = pricedLines.reduce(
     (sum, priced) => sum + priced.total,
-    0,
+    0
   );
 
   const staffUser = await prisma.staffUser.upsert({
@@ -51,8 +66,9 @@ export async function createOrderFromCart(input: CreateOrderFromCartInput) {
 
   const order = await prisma.order.create({
     data: {
-      orderNumber: `ORD-${Date.now()}`,
+      orderNumber: generateOrderNumber(),
       staffUserId: staffUser.id,
+      tableNumber: input.tableNumber ?? null,
       status: "PENDING",
       paymentStatus: "UNPAID",
       subtotalAmount,

@@ -14,6 +14,8 @@ type CreateOrderRequest = {
   lines: DraftOrderLineInput[];
 };
 
+type CreatedOrder = Awaited<ReturnType<typeof createOrderFromCart>>;
+
 async function sendTelegramMessage(chatId: string, text: string) {
   const token = process.env.TELEGRAM_BOT_TOKEN;
   if (!token) return;
@@ -30,7 +32,7 @@ async function sendTelegramMessage(chatId: string, text: string) {
   });
 }
 
-function formatLines(order: Awaited<ReturnType<typeof createOrderFromCart>>) {
+function formatLines(order: CreatedOrder) {
   return order.items.map((item) => {
     const base = `- ${item.quantity}x ${item.menuItemNameSnapshot}`;
     if (!item.modifiers.length) return base;
@@ -47,16 +49,17 @@ function formatLines(order: Awaited<ReturnType<typeof createOrderFromCart>>) {
 }
 
 function buildWaiterMessage(
-  order: Awaited<ReturnType<typeof createOrderFromCart>>,
-  table?: string | null,
+  order: CreatedOrder,
   waiter?: { firstName?: string | null; username?: string | null }
 ) {
   return [
     "🧾 Order Confirmed",
     "",
     `Order: ${order.orderNumber}`,
-    `Table: ${table || "N/A"}`,
-    `Waiter: ${waiter?.firstName ?? "Unknown"}${waiter?.username ? ` (@${waiter.username})` : ""}`,
+    `Table: ${order.tableNumber || "N/A"}`,
+    `Waiter: ${waiter?.firstName ?? "Unknown"}${
+      waiter?.username ? ` (@${waiter.username})` : ""
+    }`,
     `Total: ₦${order.totalAmount.toLocaleString()}`,
     "",
     ...formatLines(order),
@@ -64,30 +67,28 @@ function buildWaiterMessage(
 }
 
 function buildOperatorMessage(
-  order: Awaited<ReturnType<typeof createOrderFromCart>>,
-  table?: string | null,
+  order: CreatedOrder,
   waiter?: { firstName?: string | null; username?: string | null }
 ) {
   return [
     "🚨 New Order",
     "",
     `Order: ${order.orderNumber}`,
-    `Table: ${table || "N/A"}`,
-    `Waiter: ${waiter?.firstName ?? "Unknown"}${waiter?.username ? ` (@${waiter.username})` : ""}`,
+    `Table: ${order.tableNumber || "N/A"}`,
+    `Waiter: ${waiter?.firstName ?? "Unknown"}${
+      waiter?.username ? ` (@${waiter.username})` : ""
+    }`,
     "",
     ...formatLines(order),
   ].join("\n");
 }
 
-function buildChefMessage(
-  order: Awaited<ReturnType<typeof createOrderFromCart>>,
-  table?: string | null
-) {
+function buildChefMessage(order: CreatedOrder) {
   return [
     "👨‍🍳 Kitchen Order",
     "",
     `Order: ${order.orderNumber}`,
-    `Table: ${table || "N/A"}`,
+    `Table: ${order.tableNumber || "N/A"}`,
     "",
     ...formatLines(order),
   ].join("\n");
@@ -114,21 +115,22 @@ export async function POST(req: Request) {
       firstName: body.firstName ?? null,
       lastName: body.lastName ?? null,
       username: body.username ?? null,
-      notes: body.tableNumber ? `Table ${body.tableNumber}` : null,
+      notes: body.notes ?? null,
+      tableNumber: body.tableNumber ?? null,
       lines: body.lines,
     });
 
-    const waiterMsg = buildWaiterMessage(order, body.tableNumber, {
+    const waiterMsg = buildWaiterMessage(order, {
       firstName: body.firstName,
       username: body.username,
     });
 
-    const operatorMsg = buildOperatorMessage(order, body.tableNumber, {
+    const operatorMsg = buildOperatorMessage(order, {
       firstName: body.firstName,
       username: body.username,
     });
 
-    const chefMsg = buildChefMessage(order, body.tableNumber);
+    const chefMsg = buildChefMessage(order);
 
     await sendTelegramMessage(body.telegramUserId, waiterMsg);
 
@@ -140,7 +142,19 @@ export async function POST(req: Request) {
       await sendTelegramMessage(process.env.CHEF_CHAT_ID, chefMsg);
     }
 
-    return NextResponse.json({ ok: true, order });
+    return NextResponse.json({
+      ok: true,
+      order: {
+        id: order.id,
+        orderNumber: order.orderNumber,
+        tableNumber: order.tableNumber,
+        subtotalAmount: order.subtotalAmount,
+        totalAmount: order.totalAmount,
+        status: order.status,
+        paymentStatus: order.paymentStatus,
+        createdAt: order.createdAt,
+      },
+    });
   } catch {
     return NextResponse.json({ ok: false }, { status: 500 });
   }
