@@ -14,9 +14,11 @@ type CreateOrderRequest = {
   lines: DraftOrderLineInput[];
 };
 
-type CreatedOrder = Awaited<ReturnType<typeof createOrderFromCart>>;
-
-async function sendTelegramMessage(chatId: string, text: string) {
+async function sendTelegramMessage(
+  chatId: string,
+  text: string,
+  extra?: Record<string, unknown>
+) {
   const token = process.env.TELEGRAM_BOT_TOKEN;
   if (!token) return;
 
@@ -28,11 +30,12 @@ async function sendTelegramMessage(chatId: string, text: string) {
     body: JSON.stringify({
       chat_id: chatId,
       text,
+      ...(extra ?? {}),
     }),
   });
 }
 
-function formatLines(order: CreatedOrder) {
+function formatLines(order: Awaited<ReturnType<typeof createOrderFromCart>>) {
   return order.items.map((item) => {
     const base = `- ${item.quantity}x ${item.menuItemNameSnapshot}`;
     if (!item.modifiers.length) return base;
@@ -49,7 +52,7 @@ function formatLines(order: CreatedOrder) {
 }
 
 function buildWaiterMessage(
-  order: CreatedOrder,
+  order: Awaited<ReturnType<typeof createOrderFromCart>>,
   waiter?: { firstName?: string | null; username?: string | null }
 ) {
   return [
@@ -67,7 +70,7 @@ function buildWaiterMessage(
 }
 
 function buildOperatorMessage(
-  order: CreatedOrder,
+  order: Awaited<ReturnType<typeof createOrderFromCart>>,
   waiter?: { firstName?: string | null; username?: string | null }
 ) {
   return [
@@ -83,7 +86,7 @@ function buildOperatorMessage(
   ].join("\n");
 }
 
-function buildChefMessage(order: CreatedOrder) {
+function buildChefMessage(order: Awaited<ReturnType<typeof createOrderFromCart>>) {
   return [
     "👨‍🍳 Kitchen Order",
     "",
@@ -92,6 +95,19 @@ function buildChefMessage(order: CreatedOrder) {
     "",
     ...formatLines(order),
   ].join("\n");
+}
+
+function operatorActions(orderNumber: string) {
+  return {
+    reply_markup: {
+      inline_keyboard: [
+        [
+          { text: "✅ Send to Kitchen", callback_data: `sent:${orderNumber}` },
+          { text: "💰 Mark Paid", callback_data: `paid:${orderNumber}` },
+        ],
+      ],
+    },
+  };
 }
 
 export async function POST(req: Request) {
@@ -135,7 +151,11 @@ export async function POST(req: Request) {
     await sendTelegramMessage(body.telegramUserId, waiterMsg);
 
     if (process.env.OPERATOR_CHAT_ID) {
-      await sendTelegramMessage(process.env.OPERATOR_CHAT_ID, operatorMsg);
+      await sendTelegramMessage(
+        process.env.OPERATOR_CHAT_ID,
+        operatorMsg,
+        operatorActions(order.orderNumber)
+      );
     }
 
     if (process.env.CHEF_CHAT_ID) {

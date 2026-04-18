@@ -31,11 +31,7 @@ async function answerCallbackQuery(callbackQueryId: string, text: string) {
   });
 }
 
-async function editInlineButtonsForSent(
-  chatId: string,
-  messageId: number,
-  orderNumber: string
-) {
+async function editInlineButtons(chatId: string, messageId: number, orderNumber: string) {
   await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/editMessageReplyMarkup`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -54,29 +50,6 @@ async function editInlineButtonsForSent(
   });
 }
 
-async function editInlineButtonsForPaid(
-  chatId: string,
-  messageId: number,
-  orderNumber: string
-) {
-  await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/editMessageReplyMarkup`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      chat_id: chatId,
-      message_id: messageId,
-      reply_markup: {
-        inline_keyboard: [
-          [
-            { text: `✅ Sent ${orderNumber}`, callback_data: `noop:${orderNumber}` },
-            { text: `💰 Paid ${orderNumber}`, callback_data: `noop:${orderNumber}` },
-          ],
-        ],
-      },
-    }),
-  });
-}
-
 async function handleStart(chatId: string) {
   await sendMessage(chatId, "Welcome to Kitchen Bot 👨‍🍳", {
     reply_markup: {
@@ -85,7 +58,7 @@ async function handleStart(chatId: string) {
           {
             text: "📝 New Order",
             web_app: {
-              url: `${process.env.NEXT_PUBLIC_APP_URL}/tg/order?v=5`,
+              url: `${process.env.NEXT_PUBLIC_APP_URL}/tg/order?v=4`,
             },
           },
         ],
@@ -166,52 +139,13 @@ async function handleSentCallback(
     data: { status: "PREPARING" },
   });
 
-  await editInlineButtonsForSent(chatId, messageId, orderNumber);
+  await editInlineButtons(chatId, messageId, orderNumber);
+
   await answerCallbackQuery(callbackQueryId, "Order sent to kitchen");
 
   await sendMessage(
     order.staffUser.telegramUserId,
     `👨‍🍳 Your order is now being prepared\n\nOrder: ${order.orderNumber}\nTable: ${order.tableNumber || "N/A"}`
-  );
-}
-
-async function handlePaidCallback(
-  callbackQueryId: string,
-  chatId: string,
-  messageId: number,
-  orderNumber: string
-) {
-  const order = await prisma.order.findUnique({
-    where: { orderNumber },
-    include: { staffUser: true },
-  });
-
-  if (!order) {
-    await answerCallbackQuery(callbackQueryId, "Order not found");
-    return;
-  }
-
-  if (order.paymentStatus === "PAID") {
-    await answerCallbackQuery(callbackQueryId, "Order already marked paid");
-    return;
-  }
-
-  await prisma.order.update({
-    where: { orderNumber },
-    data: { paymentStatus: "PAID" },
-  });
-
-  await editInlineButtonsForPaid(chatId, messageId, orderNumber);
-  await answerCallbackQuery(callbackQueryId, "Order marked paid");
-
-  await sendMessage(
-    chatId,
-    `💰 Order marked paid\n\nOrder: ${order.orderNumber}\nTable: ${order.tableNumber || "N/A"}`
-  );
-
-  await sendMessage(
-    order.staffUser.telegramUserId,
-    `✅ Payment received\n\nOrder: ${order.orderNumber}\nTable: ${order.tableNumber || "N/A"}`
   );
 }
 
@@ -244,10 +178,7 @@ export async function POST(req: Request) {
       const callbackQueryId = String(callbackQuery.id);
 
       if (data === "NEW_ORDER") {
-        await sendMessage(
-          chatId,
-          "Use the 📝 New Order button to open the Mini App."
-        );
+        await sendMessage(chatId, "Use the 📝 New Order button to open the Mini App.");
         return NextResponse.json({ ok: true });
       }
 
@@ -257,14 +188,8 @@ export async function POST(req: Request) {
         return NextResponse.json({ ok: true });
       }
 
-      if (data.startsWith("paid:")) {
-        const orderNumber = data.replace("paid:", "");
-        await handlePaidCallback(callbackQueryId, chatId, messageId, orderNumber);
-        return NextResponse.json({ ok: true });
-      }
-
       if (data.startsWith("noop:")) {
-        await answerCallbackQuery(callbackQueryId, "Already processed");
+        await answerCallbackQuery(callbackQueryId, "Already sent");
         return NextResponse.json({ ok: true });
       }
     }

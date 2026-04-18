@@ -1,0 +1,175 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum OrderStatus {
+  PENDING
+  PREPARING
+  COMPLETED
+}
+
+enum PaymentStatus {
+  UNPAID
+  PAID
+}
+
+enum ModifierSelectionType {
+  SINGLE
+  MULTIPLE
+}
+
+enum BotSessionState {
+  IDLE
+  SELECTING_ITEMS
+  SELECTING_MODIFIERS
+  SELECTING_QUANTITY
+  REVIEWING_ORDER
+}
+
+model StaffUser {
+  id             String   @id @default(cuid())
+  telegramUserId String   @unique
+  firstName      String
+  lastName       String?
+  username       String?
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  orders Order[]
+
+  @@index([telegramUserId])
+}
+
+model MenuItem {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  price       Int
+  isActive    Boolean  @default(true)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  orderItems         OrderItem[]
+  menuModifierGroups MenuItemModifierGroup[]
+}
+
+model ModifierGroup {
+  id            String                @id @default(cuid())
+  name          String
+  selectionType ModifierSelectionType
+  isRequired    Boolean               @default(false)
+
+  // New: explicit selection constraints for production menu logic
+  // Keep defaults safe so existing data/flow continue to work
+  minSelect Int @default(0)
+  maxSelect Int @default(1)
+
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  options   ModifierOption[]
+  menuItems MenuItemModifierGroup[]
+}
+
+model ModifierOption {
+  id              String   @id @default(cuid())
+  modifierGroupId String
+  name            String
+  priceDelta      Int
+  isActive        Boolean  @default(true)
+  sortOrder       Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  modifierGroup      ModifierGroup       @relation(fields: [modifierGroupId], references: [id], onDelete: Cascade)
+  orderItemModifiers OrderItemModifier[]
+
+  @@index([modifierGroupId])
+}
+
+model MenuItemModifierGroup {
+  id              String @id @default(cuid())
+  menuItemId      String
+  modifierGroupId String
+
+  menuItem      MenuItem      @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
+  modifierGroup ModifierGroup @relation(fields: [modifierGroupId], references: [id], onDelete: Cascade)
+
+  @@unique([menuItemId, modifierGroupId])
+  @@index([menuItemId])
+  @@index([modifierGroupId])
+}
+
+model Order {
+  id             String        @id @default(cuid())
+  orderNumber    String        @unique
+  staffUserId    String
+  status         OrderStatus   @default(PENDING)
+  paymentStatus  PaymentStatus @default(UNPAID)
+  subtotalAmount Int
+  totalAmount    Int
+  notes          String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  staffUser StaffUser   @relation(fields: [staffUserId], references: [id], onDelete: Restrict)
+  items     OrderItem[]
+
+  @@index([createdAt])
+  @@index([status])
+  @@index([paymentStatus])
+  @@index([staffUserId])
+}
+
+model OrderItem {
+  id                   String   @id @default(cuid())
+  orderId              String
+  menuItemId           String?
+  menuItemNameSnapshot String
+  unitPriceSnapshot    Int
+  quantity             Int
+  lineTotal            Int
+  createdAt            DateTime @default(now())
+
+  order     Order               @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  menuItem  MenuItem?           @relation(fields: [menuItemId], references: [id], onDelete: SetNull)
+  modifiers OrderItemModifier[]
+
+  @@index([orderId])
+}
+
+model OrderItemModifier {
+  id                         String  @id @default(cuid())
+  orderItemId                String
+  modifierOptionId           String?
+  modifierGroupNameSnapshot  String
+  modifierOptionNameSnapshot String
+  priceDeltaSnapshot         Int
+
+  // New: counted selections, e.g. assorted x2
+  quantity Int @default(1)
+
+  orderItem      OrderItem       @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+  modifierOption ModifierOption? @relation(fields: [modifierOptionId], references: [id], onDelete: SetNull)
+
+  @@index([orderItemId])
+  @@index([modifierOptionId])
+}
+
+model BotSession {
+  id             String          @id @default(cuid())
+  telegramUserId String          @unique
+  state          BotSessionState @default(IDLE)
+  draftOrderJson Json?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  @@index([telegramUserId])
+}
