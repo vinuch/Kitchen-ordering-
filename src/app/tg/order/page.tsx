@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Script from "next/script";
 import { MenuList } from "./_components/menu-list";
 import { MenuItemDetailPanel } from "./_components/menu-item-detail";
 import type {
@@ -10,7 +11,6 @@ import type {
   MenuListItem,
 } from "./_components/types";
 import { getTelegramWebApp } from "./_components/telegram-webapp";
-import Script from "next/script";
 
 export default function TelegramOrderPage() {
   const [items, setItems] = useState<MenuListItem[]>([]);
@@ -27,19 +27,21 @@ export default function TelegramOrderPage() {
   const [submittedOrderNumber, setSubmittedOrderNumber] = useState<
     string | null
   >(null);
+  const [tableNumber, setTableNumber] = useState("");
 
   const [telegramUser, setTelegramUser] = useState<{
     id: string;
     firstName: string | null;
     lastName: string | null;
     username: string | null;
+    initData: string;
   } | null>(null);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
       const webApp = getTelegramWebApp();
 
-      if (!webApp) return;
+      if (!webApp?.initData) return;
 
       webApp.ready?.();
       webApp.expand?.();
@@ -53,33 +55,11 @@ export default function TelegramOrderPage() {
         firstName: user.first_name ?? null,
         lastName: user.last_name ?? null,
         username: user.username ?? null,
+        initData: webApp.initData,
       });
     }, 0);
 
     return () => window.clearTimeout(timer);
-  }, []);
-  useEffect(() => {
-    const webApp = getTelegramWebApp();
-
-    if (!webApp) {
-      return;
-    }
-
-    webApp.ready?.();
-    webApp.expand?.();
-
-    const user = webApp.initDataUnsafe?.user;
-
-    if (!user?.id) {
-      return;
-    }
-
-    setTelegramUser({
-      id: String(user.id),
-      firstName: user.first_name ?? null,
-      lastName: user.last_name ?? null,
-      username: user.username ?? null,
-    });
   }, []);
 
   useEffect(() => {
@@ -107,10 +87,6 @@ export default function TelegramOrderPage() {
         setLoadingMenu(false);
       }
     }
-    <Script
-      src="https://telegram.org/js/telegram-web-app.js"
-      strategy="afterInteractive"
-    />;
 
     loadMenu();
   }, []);
@@ -160,15 +136,19 @@ export default function TelegramOrderPage() {
   }, [cart]);
 
   async function handleSubmitOrder() {
+    if (!telegramUser?.id || !telegramUser.initData) {
+      setSubmitError("Open this page from Telegram to submit an order");
+      return;
+    }
+
+    if (!tableNumber.trim()) {
+      setSubmitError("Enter a table number");
+      return;
+    }
+
     if (cart.length === 0) {
       setSubmitError("Add at least one item to the order");
       return;
-    }
-    //if (!telegramUser) {
-    //    setSubmitError("Open this page from Telegram to submit as a real staff user");
-    //    }
-    if (!telegramUser) {
-      console.warn("Telegram user not detected, falling back to demo identity");
     }
 
     try {
@@ -179,10 +159,12 @@ export default function TelegramOrderPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          telegramUserId: telegramUser?.id ?? "miniapp-demo-user",
-          firstName: telegramUser?.firstName ?? "MiniApp",
-          lastName: telegramUser?.lastName ?? "Demo",
-          username: telegramUser?.username ?? "miniapp_demo",
+          telegramUserId: telegramUser.id,
+          firstName: telegramUser.firstName,
+          lastName: telegramUser.lastName,
+          username: telegramUser.username,
+          initData: telegramUser.initData,
+          tableNumber: tableNumber.trim(),
           lines: cart.map((line) => ({
             menuItemId: line.menuItemId,
             quantity: line.quantity,
@@ -202,9 +184,10 @@ export default function TelegramOrderPage() {
 
       setSubmittedOrderNumber(json.order.orderNumber);
       setCart([]);
+      setTableNumber("");
     } catch (error) {
       setSubmitError(
-        error instanceof Error ? error.message : "Failed to submit order",
+        error instanceof Error ? error.message : "Failed to submit order"
       );
     } finally {
       setSubmitting(false);
@@ -215,8 +198,9 @@ export default function TelegramOrderPage() {
     <main className="min-h-screen bg-[#f7f7f7] p-4">
       <Script
         src="https://telegram.org/js/telegram-web-app.js"
-        strategy="beforeInteractive"
+        strategy="afterInteractive"
       />
+
       <div className="mx-auto max-w-6xl">
         <div className="mb-4">
           <h1 className="text-2xl font-bold text-black">New Order</h1>
@@ -235,6 +219,19 @@ export default function TelegramOrderPage() {
             Order submitted successfully. Order #: {submittedOrderNumber}
           </div>
         ) : null}
+
+        <div className="mb-4 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+          <label className="mb-2 block text-sm font-semibold text-black">
+            Table Number
+          </label>
+          <input
+            type="text"
+            value={tableNumber}
+            onChange={(e) => setTableNumber(e.target.value)}
+            placeholder="e.g. 7"
+            className="w-full rounded-xl border border-gray-300 px-3 py-2 text-black outline-none"
+          />
+        </div>
 
         <div className="grid gap-4 lg:grid-cols-[280px_minmax(0,1fr)_340px]">
           <section>
@@ -327,6 +324,13 @@ export default function TelegramOrderPage() {
                   ))}
 
                   <div className="rounded-2xl bg-gray-50 p-4">
+                    <div className="mb-2 flex items-center justify-between">
+                      <div className="text-sm text-gray-600">Table</div>
+                      <div className="text-sm font-semibold text-black">
+                        {tableNumber || "Not set"}
+                      </div>
+                    </div>
+
                     <div className="flex items-center justify-between">
                       <div className="text-sm text-gray-600">Total</div>
                       <div className="text-xl font-bold text-black">

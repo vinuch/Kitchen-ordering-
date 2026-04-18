@@ -39,6 +39,7 @@ export async function POST(req: Request) {
 
   if (message) {
     const chatId = message.chat.id;
+    console.log("OPERATOR_CHAT_ID:", message.chat.id);
     const text = message.text;
 
     if (text === "/start") {
@@ -49,7 +50,7 @@ export async function POST(req: Request) {
               {
                 text: "📝 New Order",
                 web_app: {
-                  url: `${process.env.NEXT_PUBLIC_APP_URL}/tg/order`,
+                  url: `${process.env.NEXT_PUBLIC_APP_URL}/tg/order?v=3`,
                 },
               },
             ],
