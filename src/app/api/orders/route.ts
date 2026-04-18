@@ -20,7 +20,9 @@ async function sendTelegramMessage(chatId: string, text: string) {
 
   await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+    },
     body: JSON.stringify({
       chat_id: chatId,
       text,
@@ -44,7 +46,11 @@ function formatLines(order: Awaited<ReturnType<typeof createOrderFromCart>>) {
   });
 }
 
-function buildWaiterMessage(order: Awaited<ReturnType<typeof createOrderFromCart>>, table?: string | null, waiter?: any) {
+function buildWaiterMessage(
+  order: Awaited<ReturnType<typeof createOrderFromCart>>,
+  table?: string | null,
+  waiter?: { firstName?: string | null; username?: string | null }
+) {
   return [
     "🧾 Order Confirmed",
     "",
@@ -57,13 +63,31 @@ function buildWaiterMessage(order: Awaited<ReturnType<typeof createOrderFromCart
   ].join("\n");
 }
 
-function buildOperatorMessage(order: Awaited<ReturnType<typeof createOrderFromCart>>, table?: string | null, waiter?: any) {
+function buildOperatorMessage(
+  order: Awaited<ReturnType<typeof createOrderFromCart>>,
+  table?: string | null,
+  waiter?: { firstName?: string | null; username?: string | null }
+) {
   return [
     "🚨 New Order",
     "",
     `Order: ${order.orderNumber}`,
     `Table: ${table || "N/A"}`,
     `Waiter: ${waiter?.firstName ?? "Unknown"}${waiter?.username ? ` (@${waiter.username})` : ""}`,
+    "",
+    ...formatLines(order),
+  ].join("\n");
+}
+
+function buildChefMessage(
+  order: Awaited<ReturnType<typeof createOrderFromCart>>,
+  table?: string | null
+) {
+  return [
+    "👨‍🍳 Kitchen Order",
+    "",
+    `Order: ${order.orderNumber}`,
+    `Table: ${table || "N/A"}`,
     "",
     ...formatLines(order),
   ].join("\n");
@@ -104,10 +128,16 @@ export async function POST(req: Request) {
       username: body.username,
     });
 
+    const chefMsg = buildChefMessage(order, body.tableNumber);
+
     await sendTelegramMessage(body.telegramUserId, waiterMsg);
 
     if (process.env.OPERATOR_CHAT_ID) {
       await sendTelegramMessage(process.env.OPERATOR_CHAT_ID, operatorMsg);
+    }
+
+    if (process.env.CHEF_CHAT_ID) {
+      await sendTelegramMessage(process.env.CHEF_CHAT_ID, chefMsg);
     }
 
     return NextResponse.json({ ok: true, order });
