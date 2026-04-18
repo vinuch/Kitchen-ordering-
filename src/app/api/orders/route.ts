@@ -16,17 +16,11 @@ type CreateOrderRequest = {
 
 async function sendTelegramMessage(chatId: string, text: string) {
   const token = process.env.TELEGRAM_BOT_TOKEN;
-
-  if (!token) {
-    console.warn("TELEGRAM_BOT_TOKEN not set, skipping waiter confirmation");
-    return;
-  }
+  if (!token) return;
 
   await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       chat_id: chatId,
       text,
@@ -34,125 +28,90 @@ async function sendTelegramMessage(chatId: string, text: string) {
   });
 }
 
-function buildOrderSummary(
-  order: Awaited<ReturnType<typeof createOrderFromCart>>,
-  tableNumber?: string | null,
-  waiter?: { firstName?: string | null; username?: string | null }
-) {
-  const lines = order.items.map((item) => {
+function formatLines(order: Awaited<ReturnType<typeof createOrderFromCart>>) {
+  return order.items.map((item) => {
     const base = `- ${item.quantity}x ${item.menuItemNameSnapshot}`;
-
     if (!item.modifiers.length) return base;
 
-    const modifiers = item.modifiers
+    const mods = item.modifiers
       .map(
-        (modifier) =>
-          `  • ${modifier.modifierGroupNameSnapshot}: ${modifier.modifierOptionNameSnapshot} x${modifier.quantity}`
+        (m) =>
+          `  • ${m.modifierGroupNameSnapshot}: ${m.modifierOptionNameSnapshot} x${m.quantity}`
       )
       .join("\n");
 
-    return `${base}\n${modifiers}`;
+    return `${base}\n${mods}`;
   });
+}
 
-  const waiterLine = waiter
-    ? `Waiter: ${waiter.firstName ?? "Unknown"}${
-        waiter.username ? ` (@${waiter.username})` : ""
-      }`
-    : null;
-
+function buildWaiterMessage(order: Awaited<ReturnType<typeof createOrderFromCart>>, table?: string | null, waiter?: any) {
   return [
     "🧾 Order Confirmed",
     "",
     `Order: ${order.orderNumber}`,
-    `Table: ${tableNumber || "N/A"}`,
-    waiterLine,
+    `Table: ${table || "N/A"}`,
+    `Waiter: ${waiter?.firstName ?? "Unknown"}${waiter?.username ? ` (@${waiter.username})` : ""}`,
     `Total: ₦${order.totalAmount.toLocaleString()}`,
     "",
-    ...lines,
-  ]
-    .filter(Boolean)
-    .join("\n");
+    ...formatLines(order),
+  ].join("\n");
+}
+
+function buildOperatorMessage(order: Awaited<ReturnType<typeof createOrderFromCart>>, table?: string | null, waiter?: any) {
+  return [
+    "🚨 New Order",
+    "",
+    `Order: ${order.orderNumber}`,
+    `Table: ${table || "N/A"}`,
+    `Waiter: ${waiter?.firstName ?? "Unknown"}${waiter?.username ? ` (@${waiter.username})` : ""}`,
+    "",
+    ...formatLines(order),
+  ].join("\n");
 }
 
 export async function POST(req: Request) {
   try {
     const body = (await req.json()) as CreateOrderRequest;
 
-    if (!body.telegramUserId) {
-      return NextResponse.json(
-        { ok: false, error: "telegramUserId is required" },
-        { status: 400 }
-      );
+    if (!body.telegramUserId || !body.initData) {
+      return NextResponse.json({ ok: false }, { status: 400 });
     }
 
-    if (!body.initData || !process.env.TELEGRAM_BOT_TOKEN) {
-      return NextResponse.json(
-        { ok: false, error: "Invalid Telegram setup" },
-        { status: 400 }
-      );
+    if (!verifyTelegram(body.initData, process.env.TELEGRAM_BOT_TOKEN!)) {
+      return NextResponse.json({ ok: false }, { status: 401 });
     }
 
-    const isValid = verifyTelegram(
-      body.initData,
-      process.env.TELEGRAM_BOT_TOKEN
-    );
-
-    if (!isValid) {
-      return NextResponse.json(
-        { ok: false, error: "Invalid Telegram identity" },
-        { status: 401 }
-      );
+    if (!body.lines?.length) {
+      return NextResponse.json({ ok: false }, { status: 400 });
     }
-
-    if (!Array.isArray(body.lines) || body.lines.length === 0) {
-      return NextResponse.json(
-        { ok: false, error: "lines must contain at least one item" },
-        { status: 400 }
-      );
-    }
-
-    const mergedNotes = [
-      body.notes,
-      body.tableNumber ? `Table ${body.tableNumber}` : null,
-    ]
-      .filter(Boolean)
-      .join(" • ");
 
     const order = await createOrderFromCart({
       telegramUserId: body.telegramUserId,
       firstName: body.firstName ?? null,
       lastName: body.lastName ?? null,
       username: body.username ?? null,
-      notes: mergedNotes || null,
+      notes: body.tableNumber ? `Table ${body.tableNumber}` : null,
       lines: body.lines,
     });
 
-    const confirmationText = buildOrderSummary(order, body.tableNumber, {
+    const waiterMsg = buildWaiterMessage(order, body.tableNumber, {
       firstName: body.firstName,
       username: body.username,
     });
 
-    await sendTelegramMessage(body.telegramUserId, confirmationText);
-
-    return NextResponse.json({
-      ok: true,
-      order: {
-        id: order.id,
-        orderNumber: order.orderNumber,
-        subtotalAmount: order.subtotalAmount,
-        totalAmount: order.totalAmount,
-        status: order.status,
-        paymentStatus: order.paymentStatus,
-        createdAt: order.createdAt,
-      },
+    const operatorMsg = buildOperatorMessage(order, body.tableNumber, {
+      firstName: body.firstName,
+      username: body.username,
     });
-  } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Failed to create order";
 
-    return NextResponse.json(
-      { ok: false, error: message },
-      { status: 400 }
-    );
+    await sendTelegramMessage(body.telegramUserId, waiterMsg);
+
+    if (process.env.OPERATOR_CHAT_ID) {
+      await sendTelegramMessage(process.env.OPERATOR_CHAT_ID, operatorMsg);
+    }
+
+    return NextResponse.json({ ok: true, order });
+  } catch {
+    return NextResponse.json({ ok: false }, { status: 500 });
   }
 }
