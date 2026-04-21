@@ -3,77 +3,89 @@ import { prisma } from "@/lib/prisma";
 
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN!;
 
+async function tgCall(method: string, payload: Record<string, unknown>) {
+  try {
+    const res = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/${method}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+
+    const text = await res.text();
+
+    if (!res.ok) {
+      console.error(`${method} failed:`, text);
+      return null;
+    }
+
+    try {
+      return JSON.parse(text);
+    } catch {
+      return text;
+    }
+  } catch (error) {
+    console.error(`${method} exception:`, error);
+    return null;
+  }
+}
+
 async function sendMessage(
   chatId: string,
   text: string,
   extra?: Record<string, unknown>
 ) {
-  await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      chat_id: chatId,
-      text,
-      ...(extra ?? {}),
-    }),
+  return tgCall("sendMessage", {
+    chat_id: chatId,
+    text,
+    ...(extra ?? {}),
   });
 }
 
 async function answerCallbackQuery(callbackQueryId: string, text: string) {
-  await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/answerCallbackQuery`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      callback_query_id: callbackQueryId,
-      text,
-      show_alert: false,
-    }),
+  return tgCall("answerCallbackQuery", {
+    callback_query_id: callbackQueryId,
+    text,
+    show_alert: false,
   });
 }
 
-async function editInlineButtonsForSent(
-  chatId: string,
-  messageId: number,
-  orderNumber: string
+function actionKeyboard(
+  orderNumber: string,
+  status: string,
+  paymentStatus: string
 ) {
-  await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/editMessageReplyMarkup`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      chat_id: chatId,
-      message_id: messageId,
-      reply_markup: {
-        inline_keyboard: [
-          [
-            { text: `✅ Sent ${orderNumber}`, callback_data: `noop:${orderNumber}` },
-            { text: "💰 Mark Paid", callback_data: `paid:${orderNumber}` },
-          ],
+  const sentDone = status !== "PENDING";
+  const paidDone = paymentStatus === "PAID";
+
+  return {
+    reply_markup: {
+      inline_keyboard: [
+        [
+          {
+            text: sentDone ? `✅ Sent ${orderNumber}` : "✅ Send to Kitchen",
+            callback_data: sentDone ? `noop:${orderNumber}` : `sent:${orderNumber}`,
+          },
+          {
+            text: paidDone ? `💰 Paid ${orderNumber}` : "💰 Mark Paid",
+            callback_data: paidDone ? `noop:${orderNumber}` : `paid:${orderNumber}`,
+          },
         ],
-      },
-    }),
-  });
+      ],
+    },
+  };
 }
 
-async function editInlineButtonsForPaid(
+async function editInlineButtons(
   chatId: string,
   messageId: number,
-  orderNumber: string
+  orderNumber: string,
+  status: string,
+  paymentStatus: string
 ) {
-  await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/editMessageReplyMarkup`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      chat_id: chatId,
-      message_id: messageId,
-      reply_markup: {
-        inline_keyboard: [
-          [
-            { text: `✅ Sent ${orderNumber}`, callback_data: `noop:${orderNumber}` },
-            { text: `💰 Paid ${orderNumber}`, callback_data: `noop:${orderNumber}` },
-          ],
-        ],
-      },
-    }),
+  return tgCall("editMessageReplyMarkup", {
+    chat_id: chatId,
+    message_id: messageId,
+    ...actionKeyboard(orderNumber, status, paymentStatus),
   });
 }
 
@@ -85,7 +97,7 @@ async function handleStart(chatId: string) {
           {
             text: "📝 New Order",
             web_app: {
-              url: `${process.env.NEXT_PUBLIC_APP_URL}/tg/order?v=5`,
+              url: `${process.env.NEXT_PUBLIC_APP_URL}/tg/order?v=6`,
             },
           },
         ],
@@ -109,6 +121,21 @@ async function handleSentCommand(chatId: string, text: string) {
     return;
   }
 
+  const result = await prisma.order.updateMany({
+    where: { orderNumber, status: "PENDING" },
+    data: { status: "PREPARING" },
+  });
+
+  if (result.count === 0) {
+    const existing = await prisma.order.findUnique({ where: { orderNumber } });
+    if (!existing) {
+      await sendMessage(chatId, "❌ Order not found");
+      return;
+    }
+    await sendMessage(chatId, "⚠️ Order already sent or completed");
+    return;
+  }
+
   const order = await prisma.order.findUnique({
     where: { orderNumber },
     include: { staffUser: true },
@@ -118,16 +145,6 @@ async function handleSentCommand(chatId: string, text: string) {
     await sendMessage(chatId, "❌ Order not found");
     return;
   }
-
-  if (order.status !== "PENDING") {
-    await sendMessage(chatId, "⚠️ Order already sent or completed");
-    return;
-  }
-
-  await prisma.order.update({
-    where: { orderNumber },
-    data: { status: "PREPARING" },
-  });
 
   await sendMessage(
     chatId,
@@ -146,6 +163,11 @@ async function handleSentCallback(
   messageId: number,
   orderNumber: string
 ) {
+  const result = await prisma.order.updateMany({
+    where: { orderNumber, status: "PENDING" },
+    data: { status: "PREPARING" },
+  });
+
   const order = await prisma.order.findUnique({
     where: { orderNumber },
     include: { staffUser: true },
@@ -156,17 +178,20 @@ async function handleSentCallback(
     return;
   }
 
-  if (order.status !== "PENDING") {
+  if (result.count === 0) {
+    console.log("Duplicate sent blocked", orderNumber);
     await answerCallbackQuery(callbackQueryId, "Order already sent");
     return;
   }
 
-  await prisma.order.update({
-    where: { orderNumber },
-    data: { status: "PREPARING" },
-  });
+  await editInlineButtons(
+    chatId,
+    messageId,
+    order.orderNumber,
+    "PREPARING",
+    order.paymentStatus
+  );
 
-  await editInlineButtonsForSent(chatId, messageId, orderNumber);
   await answerCallbackQuery(callbackQueryId, "Order sent to kitchen");
 
   await sendMessage(
@@ -181,6 +206,11 @@ async function handlePaidCallback(
   messageId: number,
   orderNumber: string
 ) {
+  const result = await prisma.order.updateMany({
+    where: { orderNumber, paymentStatus: "UNPAID" },
+    data: { paymentStatus: "PAID" },
+  });
+
   const order = await prisma.order.findUnique({
     where: { orderNumber },
     include: { staffUser: true },
@@ -191,17 +221,20 @@ async function handlePaidCallback(
     return;
   }
 
-  if (order.paymentStatus === "PAID") {
+  if (result.count === 0) {
+    console.log("Duplicate paid blocked", orderNumber);
     await answerCallbackQuery(callbackQueryId, "Order already marked paid");
     return;
   }
 
-  await prisma.order.update({
-    where: { orderNumber },
-    data: { paymentStatus: "PAID" },
-  });
+  await editInlineButtons(
+    chatId,
+    messageId,
+    order.orderNumber,
+    order.status,
+    "PAID"
+  );
 
-  await editInlineButtonsForPaid(chatId, messageId, orderNumber);
   await answerCallbackQuery(callbackQueryId, "Order marked paid");
 
   await sendMessage(
@@ -244,10 +277,7 @@ export async function POST(req: Request) {
       const callbackQueryId = String(callbackQuery.id);
 
       if (data === "NEW_ORDER") {
-        await sendMessage(
-          chatId,
-          "Use the 📝 New Order button to open the Mini App."
-        );
+        await sendMessage(chatId, "Use the 📝 New Order button to open the Mini App.");
         return NextResponse.json({ ok: true });
       }
 

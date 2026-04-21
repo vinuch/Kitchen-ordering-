@@ -81,6 +81,7 @@ function buildOperatorMessage(
     `Waiter: ${waiter?.firstName ?? "Unknown"}${
       waiter?.username ? ` (@${waiter.username})` : ""
     }`,
+    `Total: ₦${order.totalAmount.toLocaleString()}`,
     "",
     ...formatLines(order),
   ].join("\n");
@@ -92,6 +93,7 @@ function buildChefMessage(order: Awaited<ReturnType<typeof createOrderFromCart>>
     "",
     `Order: ${order.orderNumber}`,
     `Table: ${order.tableNumber || "N/A"}`,
+    `Total: ₦${order.totalAmount.toLocaleString()}`,
     "",
     ...formatLines(order),
   ].join("\n");
