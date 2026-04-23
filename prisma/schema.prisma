@@ -17,6 +17,12 @@ enum PaymentStatus {
   PAID
 }
 
+enum PaymentMethod {
+  CASH
+  TRANSFER
+  POS
+}
+
 enum ModifierSelectionType {
   SINGLE
   MULTIPLE
@@ -110,6 +116,7 @@ model Order {
   tableNumber    String?
   status         OrderStatus   @default(PENDING)
   paymentStatus  PaymentStatus @default(UNPAID)
+  paymentMethod  PaymentMethod?
   subtotalAmount Int
   totalAmount    Int
   notes          String?
@@ -122,6 +129,7 @@ model Order {
   @@index([createdAt])
   @@index([status])
   @@index([paymentStatus])
+  @@index([paymentMethod])
   @@index([staffUserId])
   @@index([tableNumber])
 }
