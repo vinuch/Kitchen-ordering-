@@ -3,6 +3,19 @@ import { createOrderFromCart } from "@/server/order/create-order-from-cart";
 import type { DraftOrderLineInput } from "@/server/order/types";
 import { verifyTelegram } from "@/lib/verifyTelegram";
 
+
+
+function getAllowedTelegramUserIds() {
+  return (process.env.ALLOWED_TELEGRAM_USER_IDS ?? "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+function isAllowedTelegramUserId(userId: string) {
+  return getAllowedTelegramUserIds().includes(userId);
+}
+
 type CreateOrderRequest = {
   telegramUserId?: string;
   firstName?: string | null;
@@ -87,27 +100,15 @@ function buildOperatorMessage(
   ].join("\n");
 }
 
-function buildChefMessage(order: Awaited<ReturnType<typeof createOrderFromCart>>) {
-  return [
-    "👨‍🍳 Kitchen Order",
-    "",
-    `Order: ${order.orderNumber}`,
-    `Table: ${order.tableNumber || "N/A"}`,
-    `Total: ₦${order.totalAmount.toLocaleString()}`,
-    "",
-    ...formatLines(order),
-  ].join("\n");
-}
-
 function operatorActions(orderNumber: string) {
   return {
     reply_markup: {
       inline_keyboard: [
         [
           { text: "✅ Send to Kitchen", callback_data: `sent:${orderNumber}` },
-          { text: "💵 Cash", callback_data: `paid_cash:${orderNumber}` },
         ],
         [
+          { text: "💵 Cash", callback_data: `paid_cash:${orderNumber}` },
           { text: "🏦 Transfer", callback_data: `paid_transfer:${orderNumber}` },
           { text: "💳 POS", callback_data: `paid_pos:${orderNumber}` },
         ],
@@ -126,6 +127,10 @@ export async function POST(req: Request) {
 
     if (!verifyTelegram(body.initData, process.env.TELEGRAM_BOT_TOKEN!)) {
       return NextResponse.json({ ok: false }, { status: 401 });
+    }
+
+    if (!isAllowedTelegramUserId(body.telegramUserId)) {
+      return NextResponse.json({ ok: false, error: "Not authorized" }, { status: 403 });
     }
 
     if (!body.lines?.length) {
@@ -152,24 +157,22 @@ export async function POST(req: Request) {
       username: body.username,
     });
 
-    const chefMsg = buildChefMessage(order);
-
     const waiterChatId = body.telegramUserId;
     const operatorChatId = process.env.OPERATOR_CHAT_ID;
-    const chefChatId = process.env.CHEF_CHAT_ID;
 
     await sendTelegramMessage(waiterChatId, waiterMsg);
 
-    if (operatorChatId) {
+    const operatorIds = (process.env.OPERATOR_CHAT_IDS ?? "")
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+
+    for (const opId of operatorIds) {
       await sendTelegramMessage(
-        operatorChatId,
+        opId,
         operatorMsg,
         operatorActions(order.orderNumber)
       );
-    }
-
-    if (chefChatId && chefChatId !== operatorChatId) {
-      await sendTelegramMessage(chefChatId, chefMsg);
     }
 
     return NextResponse.json({
@@ -182,6 +185,7 @@ export async function POST(req: Request) {
         totalAmount: order.totalAmount,
         status: order.status,
         paymentStatus: order.paymentStatus,
+        paymentMethod: order.paymentMethod,
         createdAt: order.createdAt,
       },
     });

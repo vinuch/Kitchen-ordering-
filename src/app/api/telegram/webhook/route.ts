@@ -3,6 +3,18 @@ import { prisma } from "@/lib/prisma";
 
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN!;
 
+function getAllowedTelegramUserIds() {
+  return (process.env.ALLOWED_TELEGRAM_USER_IDS ?? "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+function isAllowedTelegramUserId(userId: string) {
+  return getAllowedTelegramUserIds().includes(userId);
+}
+
+
 async function tgCall(method: string, payload: Record<string, unknown>) {
   try {
     const res = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/${method}`, {
@@ -553,6 +565,23 @@ export async function POST(req: Request) {
     const body = await req.json();
 
     const message = body.message;
+    const callbackQuery = body.callback_query;
+
+    if (message?.from?.id) {
+      const userId = String(message.from.id);
+      if (!isAllowedTelegramUserId(userId)) {
+        return NextResponse.json({ ok: true });
+      }
+    }
+
+    if (callbackQuery?.from?.id) {
+      const userId = String(callbackQuery.from.id);
+      if (!isAllowedTelegramUserId(userId)) {
+        await answerCallbackQuery(callbackQuery.id, "Not authorized");
+        return NextResponse.json({ ok: true });
+      }
+    }
+
     const callbackQuery = body.callback_query;
 
     if (message?.text) {
