@@ -115,7 +115,7 @@ async function editInlineButtons(
 }
 
 async function handleStart(chatId: string) {
-  const url = `${process.env.NEXT_PUBLIC_APP_URL}/tg/order?v=8`;
+  const url = `${process.env.NEXT_PUBLIC_APP_URL}/tg/order?v=9`;
 
   await sendMessage(chatId, "Welcome to Kitchen Bot 👨‍🍳", {
     reply_markup: {
@@ -133,19 +133,13 @@ async function handleStart(chatId: string) {
     },
   });
 
-  await sendMessage(chatId, "Or use the inline button below:", {
+  await sendMessage(chatId, "Use the button below to open the Mini App.", {
     reply_markup: {
       inline_keyboard: [
         [
           {
             text: "📝 New Order",
             web_app: { url },
-          },
-        ],
-        [
-          {
-            text: "↩️ Fallback Inline Order",
-            callback_data: "NEW_ORDER",
           },
         ],
       ],
