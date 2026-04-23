@@ -3,36 +3,6 @@ import { prisma } from "@/lib/prisma";
 
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN!;
 
-async function handleCancelCommand(chatId: string, text: string) {
-  const parts = text.trim().split(/\s+/);
-  const orderNumber = parts[1];
-
-  if (!orderNumber) {
-    await sendMessage(chatId, "❌ Usage: /cancel ORD-XXXX");
-    return;
-  }
-
-  const order = await prisma.order.findUnique({
-    where: { orderNumber },
-  });
-
-  if (!order) {
-    await sendMessage(chatId, "❌ Order not found");
-    return;
-  }
-
-  if (order.paymentStatus === "PAID") {
-    await sendMessage(chatId, "⚠️ Cannot cancel a paid order");
-    return;
-  }
-
-  await prisma.order.delete({
-    where: { orderNumber },
-  });
-
-  await sendMessage(chatId, `🗑️ Order ${orderNumber} cancelled`);
-}
-
 async function tgCall(method: string, payload: Record<string, unknown>) {
   try {
     const res = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/${method}`, {
@@ -270,6 +240,36 @@ async function handleUnpaid(chatId: string) {
   await sendMessage(chatId, message);
 }
 
+async function handleCancelCommand(chatId: string, text: string) {
+  const parts = text.trim().split(/\s+/);
+  const orderNumber = parts[1];
+
+  if (!orderNumber) {
+    await sendMessage(chatId, "❌ Usage: /cancel ORD-XXXX");
+    return;
+  }
+
+  const order = await prisma.order.findUnique({
+    where: { orderNumber },
+  });
+
+  if (!order) {
+    await sendMessage(chatId, "❌ Order not found");
+    return;
+  }
+
+  if (order.paymentStatus === "PAID") {
+    await sendMessage(chatId, "⚠️ Cannot cancel a paid order");
+    return;
+  }
+
+  await prisma.order.delete({
+    where: { orderNumber },
+  });
+
+  await sendMessage(chatId, `🗑️ Order ${orderNumber} cancelled`);
+}
+
 async function handleSentCommand(chatId: string, text: string) {
   const parts = text.trim().split(/\s+/);
   const orderNumber = parts[1];
@@ -446,13 +446,15 @@ export async function POST(req: Request) {
         return NextResponse.json({ ok: true });
       }
 
+      if (text.startsWith("/cancel")) {
+        await handleCancelCommand(chatId, text);
+        return NextResponse.json({ ok: true });
+      }
+
       if (text.startsWith("/sent")) {
         await handleSentCommand(chatId, text);
         return NextResponse.json({ ok: true });
       }
-      if (text.startsWith("/cancel")) {
-	await handleCancelCommand(chatId, text);
-	return NextResponse.json({ ok: true });
     }
 
     if (callbackQuery?.data) {
@@ -465,7 +467,7 @@ export async function POST(req: Request) {
         await sendMessage(chatId, "Use the 📝 New Order button to open the Mini App.");
         return NextResponse.json({ ok: true });
       }
-8672793133:AAF9esmY6fmI2WZO3DwgIgYuQz6s6ajbJvE
+
       if (data.startsWith("sent:")) {
         const orderNumber = data.replace("sent:", "");
         await handleSentCallback(callbackQueryId, chatId, messageId, orderNumber);
