@@ -105,7 +105,11 @@ function operatorActions(orderNumber: string) {
       inline_keyboard: [
         [
           { text: "✅ Send to Kitchen", callback_data: `sent:${orderNumber}` },
-          { text: "💰 Mark Paid", callback_data: `paid:${orderNumber}` },
+          { text: "💵 Cash", callback_data: `paid_cash:${orderNumber}` },
+        ],
+        [
+          { text: "🏦 Transfer", callback_data: `paid_transfer:${orderNumber}` },
+          { text: "💳 POS", callback_data: `paid_pos:${orderNumber}` },
         ],
       ],
     },
@@ -150,18 +154,22 @@ export async function POST(req: Request) {
 
     const chefMsg = buildChefMessage(order);
 
-    await sendTelegramMessage(body.telegramUserId, waiterMsg);
+    const waiterChatId = body.telegramUserId;
+    const operatorChatId = process.env.OPERATOR_CHAT_ID;
+    const chefChatId = process.env.CHEF_CHAT_ID;
 
-    if (process.env.OPERATOR_CHAT_ID) {
+    await sendTelegramMessage(waiterChatId, waiterMsg);
+
+    if (operatorChatId) {
       await sendTelegramMessage(
-        process.env.OPERATOR_CHAT_ID,
+        operatorChatId,
         operatorMsg,
         operatorActions(order.orderNumber)
       );
     }
 
-    if (process.env.CHEF_CHAT_ID) {
-      await sendTelegramMessage(process.env.CHEF_CHAT_ID, chefMsg);
+    if (chefChatId && chefChatId !== operatorChatId) {
+      await sendTelegramMessage(chefChatId, chefMsg);
     }
 
     return NextResponse.json({
@@ -177,7 +185,8 @@ export async function POST(req: Request) {
         createdAt: order.createdAt,
       },
     });
-  } catch {
+  } catch (error) {
+    console.error("POST /api/orders failed", error);
     return NextResponse.json({ ok: false }, { status: 500 });
   }
 }

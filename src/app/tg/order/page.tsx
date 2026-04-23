@@ -24,9 +24,7 @@ export default function TelegramOrderPage() {
   const [cart, setCart] = useState<CartLine[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
-  const [submittedOrderNumber, setSubmittedOrderNumber] = useState<
-    string | null
-  >(null);
+  const [submittedOrderNumber, setSubmittedOrderNumber] = useState<string | null>(null);
   const [tableNumber, setTableNumber] = useState("");
 
   const [telegramUser, setTelegramUser] = useState<{
@@ -47,7 +45,6 @@ export default function TelegramOrderPage() {
       webApp.expand?.();
 
       const user = webApp.initDataUnsafe?.user;
-
       if (!user?.id) return;
 
       setTelegramUser({
@@ -77,7 +74,6 @@ export default function TelegramOrderPage() {
         }
 
         setItems(json.items);
-
         if (json.items.length > 0) {
           setSelectedItemId(json.items[0].id);
         }
@@ -195,33 +191,33 @@ export default function TelegramOrderPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[#f7f7f7] p-4">
+    <main className="min-h-screen bg-[#f7f7f7] p-3">
       <Script
         src="https://telegram.org/js/telegram-web-app.js"
         strategy="afterInteractive"
       />
 
-      <div className="mx-auto max-w-6xl">
-        <div className="mb-4">
-          <h1 className="text-2xl font-bold text-black">New Order</h1>
-          <p className="mt-1 text-sm text-gray-600">
-            Build an order inside Telegram.
-          </p>
-          <div className="mt-2 text-xs text-gray-500">
+      <div className="mx-auto max-w-7xl">
+        <div className="mb-3 flex items-start justify-between gap-3">
+          <div>
+            <h1 className="text-xl font-bold text-black">New Order</h1>
+            <p className="mt-0.5 text-xs text-gray-600">Build an order inside Telegram.</p>
+          </div>
+          <div className="rounded-lg bg-white px-3 py-2 text-xs text-gray-500 shadow-sm">
             {telegramUser
-              ? `Telegram user: ${telegramUser.firstName ?? "Unknown"}${telegramUser.username ? ` (@${telegramUser.username})` : ""}`
-              : "Telegram user not detected yet"}
+              ? `${telegramUser.firstName ?? "Unknown"}${telegramUser.username ? ` (@${telegramUser.username})` : ""}`
+              : "Telegram user not detected"}
           </div>
         </div>
 
         {submittedOrderNumber ? (
-          <div className="mb-4 rounded-2xl border border-green-200 bg-green-50 p-4 text-green-800">
-            Order submitted successfully. Order #: {submittedOrderNumber}
+          <div className="mb-3 rounded-xl border border-green-200 bg-green-50 p-3 text-sm text-green-800">
+            Order submitted. Order #: {submittedOrderNumber}
           </div>
         ) : null}
 
-        <div className="mb-4 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
-          <label className="mb-2 block text-sm font-semibold text-black">
+        <div className="mb-3 rounded-xl border border-gray-200 bg-white p-3 shadow-sm">
+          <label className="mb-1 block text-xs font-semibold text-black">
             Table Number
           </label>
           <input
@@ -229,14 +225,16 @@ export default function TelegramOrderPage() {
             value={tableNumber}
             onChange={(e) => setTableNumber(e.target.value)}
             placeholder="e.g. 7"
-            className="w-full rounded-xl border border-gray-300 px-3 py-2 text-black outline-none"
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-black outline-none"
           />
         </div>
 
-        <div className="grid gap-4 lg:grid-cols-[280px_minmax(0,1fr)_340px]">
+        <div className="grid gap-3 lg:grid-cols-[240px_minmax(0,1fr)_300px]">
           <section>
-            <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
-              <div className="mb-3 text-sm font-semibold text-black">Menu</div>
+            <div className="rounded-xl border border-gray-200 bg-white p-3 shadow-sm">
+              <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-700">
+                Menu
+              </div>
 
               {loadingMenu ? (
                 <div className="text-sm text-gray-600">Loading menu...</div>
@@ -254,107 +252,92 @@ export default function TelegramOrderPage() {
 
           <section>
             {loadingItem ? (
-              <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+              <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
                 <div className="text-sm text-gray-600">Loading item...</div>
               </div>
             ) : itemError ? (
-              <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-                <div className="text-sm text-red-600">{itemError}</div>
+              <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 shadow-sm">
+                {itemError}
               </div>
             ) : (
-              <MenuItemDetailPanel
-                item={selectedItem}
-                onAddToOrder={handleAddToOrder}
-              />
+              <MenuItemDetailPanel item={selectedItem} onAddToOrder={handleAddToOrder} />
             )}
           </section>
 
           <section>
-            <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
-              <div className="mb-3 text-sm font-semibold text-black">
-                Review Order
+            <div className="sticky top-3 rounded-xl border border-gray-200 bg-white p-3 shadow-sm">
+              <div className="mb-2 flex items-center justify-between">
+                <div className="text-xs font-semibold uppercase tracking-wide text-gray-700">
+                  Order
+                </div>
+                <div className="text-sm font-semibold text-black">
+                  ₦{cartTotal.toLocaleString()}
+                </div>
               </div>
 
               {cart.length === 0 ? (
-                <div className="text-sm text-gray-600">No items added yet.</div>
+                <div className="rounded-lg bg-gray-50 p-3 text-sm text-gray-500">
+                  No items yet.
+                </div>
               ) : (
-                <div className="space-y-3">
+                <div className="max-h-[55vh] space-y-2 overflow-y-auto pr-1">
                   {cart.map((line) => (
                     <div
                       key={line.id}
-                      className="rounded-2xl border border-gray-200 p-3"
+                      className="rounded-lg border border-gray-200 p-3"
                     >
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <div className="font-semibold text-black">
-                            {line.menuItemName}
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <div className="text-sm font-semibold text-black">
+                            {line.quantity}x {line.menuItemName}
                           </div>
-                          <div className="text-sm text-gray-600">
-                            Qty: {line.quantity}
-                          </div>
-                        </div>
-
-                        <button
-                          type="button"
-                          onClick={() => removeCartLine(line.id)}
-                          className="text-sm font-medium text-red-600"
-                        >
-                          Remove
-                        </button>
-                      </div>
-
-                      {line.selections.length > 0 ? (
-                        <div className="mt-3 space-y-1 text-sm text-gray-700">
-                          {line.selections.map((selection) => (
-                            <div
-                              key={`${line.id}-${selection.modifierOptionId}`}
-                            >
-                              {selection.modifierGroupName}:{" "}
-                              {selection.modifierOptionName} x
-                              {selection.quantity}
+                          {line.selections.length ? (
+                            <div className="mt-1 space-y-0.5">
+                              {line.selections.map((selection, idx) => (
+                                <div
+                                  key={`${line.id}-${idx}`}
+                                  className="text-[11px] text-gray-600"
+                                >
+                                  • {selection.modifierGroupName}: {selection.modifierOptionName}
+                                  {selection.quantity > 1 ? ` x${selection.quantity}` : ""}
+                                </div>
+                              ))}
                             </div>
-                          ))}
+                          ) : null}
                         </div>
-                      ) : null}
 
-                      <div className="mt-3 text-sm font-semibold text-black">
-                        ₦{line.total.toLocaleString()}
+                        <div className="text-right">
+                          <div className="text-xs font-semibold text-black">
+                            ₦{line.total.toLocaleString()}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => removeCartLine(line.id)}
+                            className="mt-1 text-[11px] text-red-600"
+                          >
+                            Remove
+                          </button>
+                        </div>
                       </div>
                     </div>
                   ))}
-
-                  <div className="rounded-2xl bg-gray-50 p-4">
-                    <div className="mb-2 flex items-center justify-between">
-                      <div className="text-sm text-gray-600">Table</div>
-                      <div className="text-sm font-semibold text-black">
-                        {tableNumber || "Not set"}
-                      </div>
-                    </div>
-
-                    <div className="flex items-center justify-between">
-                      <div className="text-sm text-gray-600">Total</div>
-                      <div className="text-xl font-bold text-black">
-                        ₦{cartTotal.toLocaleString()}
-                      </div>
-                    </div>
-
-                    {submitError ? (
-                      <div className="mt-3 text-sm text-red-600">
-                        {submitError}
-                      </div>
-                    ) : null}
-
-                    <button
-                      type="button"
-                      onClick={handleSubmitOrder}
-                      disabled={submitting}
-                      className="mt-4 w-full rounded-2xl bg-black px-4 py-3 text-sm font-semibold text-white disabled:opacity-50"
-                    >
-                      {submitting ? "Submitting..." : "Submit Order"}
-                    </button>
-                  </div>
                 </div>
               )}
+
+              {submitError ? (
+                <div className="mt-3 rounded-lg bg-red-50 p-2 text-xs text-red-700">
+                  {submitError}
+                </div>
+              ) : null}
+
+              <button
+                type="button"
+                onClick={handleSubmitOrder}
+                disabled={submitting || cart.length === 0}
+                className="mt-3 w-full rounded-xl bg-black px-4 py-3 text-sm font-semibold text-white disabled:opacity-50"
+              >
+                {submitting ? "Submitting..." : `Submit Order • ₦${cartTotal.toLocaleString()}`}
+              </button>
             </div>
           </section>
         </div>

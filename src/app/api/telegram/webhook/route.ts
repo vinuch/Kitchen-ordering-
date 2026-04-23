@@ -49,28 +49,50 @@ async function answerCallbackQuery(callbackQueryId: string, text: string) {
   });
 }
 
+function paymentLabel(method: string | null | undefined) {
+  if (method === "CASH") return "💵 Cash";
+  if (method === "TRANSFER") return "🏦 Transfer";
+  if (method === "POS") return "💳 POS";
+  return "💰 Paid";
+}
+
 function actionKeyboard(
   orderNumber: string,
   status: string,
-  paymentStatus: string
+  paymentStatus: string,
+  paymentMethod?: string | null
 ) {
   const sentDone = status !== "PENDING";
   const paidDone = paymentStatus === "PAID";
 
   return {
     reply_markup: {
-      inline_keyboard: [
-        [
-          {
-            text: sentDone ? `✅ Sent ${orderNumber}` : "✅ Send to Kitchen",
-            callback_data: sentDone ? `noop:${orderNumber}` : `sent:${orderNumber}`,
-          },
-          {
-            text: paidDone ? `💰 Paid ${orderNumber}` : "💰 Mark Paid",
-            callback_data: paidDone ? `noop:${orderNumber}` : `paid:${orderNumber}`,
-          },
-        ],
-      ],
+      inline_keyboard: paidDone
+        ? [
+            [
+              {
+                text: sentDone ? `✅ Sent ${orderNumber}` : "✅ Send to Kitchen",
+                callback_data: sentDone ? `noop:${orderNumber}` : `sent:${orderNumber}`,
+              },
+              {
+                text: `${paymentLabel(paymentMethod)} ${orderNumber}`,
+                callback_data: `noop:${orderNumber}`,
+              },
+            ],
+          ]
+        : [
+            [
+              {
+                text: sentDone ? `✅ Sent ${orderNumber}` : "✅ Send to Kitchen",
+                callback_data: sentDone ? `noop:${orderNumber}` : `sent:${orderNumber}`,
+              },
+              { text: "💵 Cash", callback_data: `paid_cash:${orderNumber}` },
+            ],
+            [
+              { text: "🏦 Transfer", callback_data: `paid_transfer:${orderNumber}` },
+              { text: "💳 POS", callback_data: `paid_pos:${orderNumber}` },
+            ],
+          ],
     },
   };
 }
@@ -80,12 +102,13 @@ async function editInlineButtons(
   messageId: number,
   orderNumber: string,
   status: string,
-  paymentStatus: string
+  paymentStatus: string,
+  paymentMethod?: string | null
 ) {
   return tgCall("editMessageReplyMarkup", {
     chat_id: chatId,
     message_id: messageId,
-    ...actionKeyboard(orderNumber, status, paymentStatus),
+    ...actionKeyboard(orderNumber, status, paymentStatus, paymentMethod),
   });
 }
 
@@ -97,7 +120,7 @@ async function handleStart(chatId: string) {
           {
             text: "📝 New Order",
             web_app: {
-              url: `${process.env.NEXT_PUBLIC_APP_URL}/tg/order?v=6`,
+              url: `${process.env.NEXT_PUBLIC_APP_URL}/tg/order?v=7`,
             },
           },
         ],
@@ -151,10 +174,12 @@ async function handleSentCommand(chatId: string, text: string) {
     `✅ Order sent to kitchen\n\nOrder: ${order.orderNumber}\nTable: ${order.tableNumber || "N/A"}`
   );
 
-  await sendMessage(
-    order.staffUser.telegramUserId,
-    `👨‍🍳 Your order is now being prepared\n\nOrder: ${order.orderNumber}\nTable: ${order.tableNumber || "N/A"}`
-  );
+  if (order.staffUser.telegramUserId !== chatId) {
+    await sendMessage(
+      order.staffUser.telegramUserId,
+      `👨‍🍳 Your order is now being prepared\n\nOrder: ${order.orderNumber}\nTable: ${order.tableNumber || "N/A"}`
+    );
+  }
 }
 
 async function handleSentCallback(
@@ -179,7 +204,6 @@ async function handleSentCallback(
   }
 
   if (result.count === 0) {
-    console.log("Duplicate sent blocked", orderNumber);
     await answerCallbackQuery(callbackQueryId, "Order already sent");
     return;
   }
@@ -189,26 +213,33 @@ async function handleSentCallback(
     messageId,
     order.orderNumber,
     "PREPARING",
-    order.paymentStatus
+    order.paymentStatus,
+    order.paymentMethod
   );
 
   await answerCallbackQuery(callbackQueryId, "Order sent to kitchen");
 
-  await sendMessage(
-    order.staffUser.telegramUserId,
-    `👨‍🍳 Your order is now being prepared\n\nOrder: ${order.orderNumber}\nTable: ${order.tableNumber || "N/A"}`
-  );
+  if (order.staffUser.telegramUserId !== chatId) {
+    await sendMessage(
+      order.staffUser.telegramUserId,
+      `👨‍🍳 Your order is now being prepared\n\nOrder: ${order.orderNumber}\nTable: ${order.tableNumber || "N/A"}`
+    );
+  }
 }
 
 async function handlePaidCallback(
   callbackQueryId: string,
   chatId: string,
   messageId: number,
-  orderNumber: string
+  orderNumber: string,
+  paymentMethod: "CASH" | "TRANSFER" | "POS"
 ) {
   const result = await prisma.order.updateMany({
     where: { orderNumber, paymentStatus: "UNPAID" },
-    data: { paymentStatus: "PAID" },
+    data: {
+      paymentStatus: "PAID",
+      paymentMethod,
+    },
   });
 
   const order = await prisma.order.findUnique({
@@ -222,7 +253,6 @@ async function handlePaidCallback(
   }
 
   if (result.count === 0) {
-    console.log("Duplicate paid blocked", orderNumber);
     await answerCallbackQuery(callbackQueryId, "Order already marked paid");
     return;
   }
@@ -232,20 +262,23 @@ async function handlePaidCallback(
     messageId,
     order.orderNumber,
     order.status,
-    "PAID"
+    "PAID",
+    paymentMethod
   );
 
-  await answerCallbackQuery(callbackQueryId, "Order marked paid");
+  await answerCallbackQuery(callbackQueryId, `${paymentLabel(paymentMethod)} recorded`);
 
   await sendMessage(
     chatId,
-    `💰 Order marked paid\n\nOrder: ${order.orderNumber}\nTable: ${order.tableNumber || "N/A"}`
+    `${paymentLabel(paymentMethod)} recorded\n\nOrder: ${order.orderNumber}\nTable: ${order.tableNumber || "N/A"}`
   );
 
-  await sendMessage(
-    order.staffUser.telegramUserId,
-    `✅ Payment received\n\nOrder: ${order.orderNumber}\nTable: ${order.tableNumber || "N/A"}`
-  );
+  if (order.staffUser.telegramUserId !== chatId) {
+    await sendMessage(
+      order.staffUser.telegramUserId,
+      `✅ Payment received\n\nOrder: ${order.orderNumber}\nTable: ${order.tableNumber || "N/A"}`
+    );
+  }
 }
 
 export async function POST(req: Request) {
@@ -287,9 +320,21 @@ export async function POST(req: Request) {
         return NextResponse.json({ ok: true });
       }
 
-      if (data.startsWith("paid:")) {
-        const orderNumber = data.replace("paid:", "");
-        await handlePaidCallback(callbackQueryId, chatId, messageId, orderNumber);
+      if (data.startsWith("paid_cash:")) {
+        const orderNumber = data.replace("paid_cash:", "");
+        await handlePaidCallback(callbackQueryId, chatId, messageId, orderNumber, "CASH");
+        return NextResponse.json({ ok: true });
+      }
+
+      if (data.startsWith("paid_transfer:")) {
+        const orderNumber = data.replace("paid_transfer:", "");
+        await handlePaidCallback(callbackQueryId, chatId, messageId, orderNumber, "TRANSFER");
+        return NextResponse.json({ ok: true });
+      }
+
+      if (data.startsWith("paid_pos:")) {
+        const orderNumber = data.replace("paid_pos:", "");
+        await handlePaidCallback(callbackQueryId, chatId, messageId, orderNumber, "POS");
         return NextResponse.json({ ok: true });
       }
 
