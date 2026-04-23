@@ -26,6 +26,8 @@ export default function TelegramOrderPage() {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submittedOrderNumber, setSubmittedOrderNumber] = useState<string | null>(null);
   const [tableNumber, setTableNumber] = useState("");
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [cartOpen, setCartOpen] = useState(false);
 
   const [telegramUser, setTelegramUser] = useState<{
     id: string;
@@ -38,7 +40,6 @@ export default function TelegramOrderPage() {
   useEffect(() => {
     const timer = window.setTimeout(() => {
       const webApp = getTelegramWebApp();
-
       if (!webApp?.initData) return;
 
       webApp.ready?.();
@@ -74,6 +75,7 @@ export default function TelegramOrderPage() {
         }
 
         setItems(json.items);
+
         if (json.items.length > 0) {
           setSelectedItemId(json.items[0].id);
         }
@@ -121,6 +123,8 @@ export default function TelegramOrderPage() {
 
   function handleAddToOrder(line: CartLine) {
     setCart((prev) => [...prev, line]);
+    setDetailOpen(false);
+    setCartOpen(true);
   }
 
   function removeCartLine(lineId: string) {
@@ -181,6 +185,7 @@ export default function TelegramOrderPage() {
       setSubmittedOrderNumber(json.order.orderNumber);
       setCart([]);
       setTableNumber("");
+      setCartOpen(false);
     } catch (error) {
       setSubmitError(
         error instanceof Error ? error.message : "Failed to submit order"
@@ -190,8 +195,13 @@ export default function TelegramOrderPage() {
     }
   }
 
+  function handleSelectItem(itemId: string) {
+    setSelectedItemId(itemId);
+    setDetailOpen(true);
+  }
+
   return (
-    <main className="min-h-screen bg-[#f7f7f7] p-3">
+    <main className="min-h-screen bg-[#f7f7f7] p-3 pb-28">
       <Script
         src="https://telegram.org/js/telegram-web-app.js"
         strategy="afterInteractive"
@@ -201,7 +211,7 @@ export default function TelegramOrderPage() {
         <div className="mb-3 flex items-start justify-between gap-3">
           <div>
             <h1 className="text-xl font-bold text-black">New Order</h1>
-            <p className="mt-0.5 text-xs text-gray-600">Build an order inside Telegram.</p>
+            <p className="mt-0.5 text-xs text-gray-600">Fast order entry</p>
           </div>
           <div className="rounded-lg bg-white px-3 py-2 text-xs text-gray-500 shadow-sm">
             {telegramUser
@@ -244,13 +254,13 @@ export default function TelegramOrderPage() {
                 <MenuList
                   items={items}
                   selectedItemId={selectedItemId}
-                  onSelect={setSelectedItemId}
+                  onSelect={handleSelectItem}
                 />
               )}
             </div>
           </section>
 
-          <section>
+          <section className="hidden lg:block">
             {loadingItem ? (
               <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
                 <div className="text-sm text-gray-600">Loading item...</div>
@@ -264,7 +274,7 @@ export default function TelegramOrderPage() {
             )}
           </section>
 
-          <section>
+          <section className="hidden lg:block">
             <div className="sticky top-3 rounded-xl border border-gray-200 bg-white p-3 shadow-sm">
               <div className="mb-2 flex items-center justify-between">
                 <div className="text-xs font-semibold uppercase tracking-wide text-gray-700">
@@ -282,10 +292,7 @@ export default function TelegramOrderPage() {
               ) : (
                 <div className="max-h-[55vh] space-y-2 overflow-y-auto pr-1">
                   {cart.map((line) => (
-                    <div
-                      key={line.id}
-                      className="rounded-lg border border-gray-200 p-3"
-                    >
+                    <div key={line.id} className="rounded-lg border border-gray-200 p-3">
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">
                           <div className="text-sm font-semibold text-black">
@@ -341,6 +348,109 @@ export default function TelegramOrderPage() {
             </div>
           </section>
         </div>
+      </div>
+
+      {detailOpen ? (
+        <div className="fixed inset-0 z-40 bg-black/30 lg:hidden" onClick={() => setDetailOpen(false)}>
+          <div
+            className="absolute inset-x-0 bottom-0 max-h-[82vh] overflow-y-auto rounded-t-2xl bg-white p-3"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-2 flex items-center justify-between">
+              <div className="text-sm font-semibold text-black">Item Details</div>
+              <button
+                type="button"
+                onClick={() => setDetailOpen(false)}
+                className="rounded-lg bg-gray-100 px-3 py-1.5 text-xs font-semibold text-black"
+              >
+                Close
+              </button>
+            </div>
+
+            {loadingItem ? (
+              <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+                <div className="text-sm text-gray-600">Loading item...</div>
+              </div>
+            ) : itemError ? (
+              <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 shadow-sm">
+                {itemError}
+              </div>
+            ) : (
+              <MenuItemDetailPanel item={selectedItem} onAddToOrder={handleAddToOrder} />
+            )}
+          </div>
+        </div>
+      ) : null}
+
+      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-gray-200 bg-white p-3 shadow-[0_-8px_24px_rgba(0,0,0,0.08)] lg:hidden">
+        <button
+          type="button"
+          onClick={() => setCartOpen((v) => !v)}
+          className="mb-2 flex w-full items-center justify-between rounded-xl bg-gray-100 px-4 py-3"
+        >
+          <span className="text-sm font-semibold text-black">
+            Cart • {cart.length} item{cart.length === 1 ? "" : "s"}
+          </span>
+          <span className="text-sm font-semibold text-black">₦{cartTotal.toLocaleString()}</span>
+        </button>
+
+        {cartOpen ? (
+          <div className="mb-2 max-h-48 space-y-2 overflow-y-auto">
+            {cart.length === 0 ? (
+              <div className="rounded-lg bg-gray-50 p-3 text-sm text-gray-500">No items yet.</div>
+            ) : (
+              cart.map((line) => (
+                <div key={line.id} className="rounded-lg border border-gray-200 p-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="text-sm font-semibold text-black">
+                        {line.quantity}x {line.menuItemName}
+                      </div>
+                      {line.selections.length ? (
+                        <div className="mt-1 space-y-0.5">
+                          {line.selections.map((selection, idx) => (
+                            <div key={`${line.id}-${idx}`} className="text-[11px] text-gray-600">
+                              • {selection.modifierGroupName}: {selection.modifierOptionName}
+                              {selection.quantity > 1 ? ` x${selection.quantity}` : ""}
+                            </div>
+                          ))}
+                        </div>
+                      ) : null}
+                    </div>
+
+                    <div className="text-right">
+                      <div className="text-xs font-semibold text-black">
+                        ₦{line.total.toLocaleString()}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => removeCartLine(line.id)}
+                        className="mt-1 text-[11px] text-red-600"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        ) : null}
+
+        {submitError ? (
+          <div className="mb-2 rounded-lg bg-red-50 p-2 text-xs text-red-700">
+            {submitError}
+          </div>
+        ) : null}
+
+        <button
+          type="button"
+          onClick={handleSubmitOrder}
+          disabled={submitting || cart.length === 0}
+          className="w-full rounded-xl bg-black px-4 py-3 text-sm font-semibold text-white disabled:opacity-50"
+        >
+          {submitting ? "Submitting..." : `Submit Order • ₦${cartTotal.toLocaleString()}`}
+        </button>
       </div>
     </main>
   );
