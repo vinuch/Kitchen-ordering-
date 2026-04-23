@@ -71,9 +71,11 @@ function actionKeyboard(
         ? [
             [
               {
-                text: sentDone ? `✅ Sent ${orderNumber}` : "✅ Send to Kitchen",
+                text: sentDone ? `✅ Sent ${orderNumber}` : "✅ Send",
                 callback_data: sentDone ? `noop:${orderNumber}` : `sent:${orderNumber}`,
               },
+            ],
+            [
               {
                 text: `${paymentLabel(paymentMethod)} ${orderNumber}`,
                 callback_data: `noop:${orderNumber}`,
@@ -83,12 +85,12 @@ function actionKeyboard(
         : [
             [
               {
-                text: sentDone ? `✅ Sent ${orderNumber}` : "✅ Send to Kitchen",
+                text: sentDone ? `✅ Sent ${orderNumber}` : "✅ Send",
                 callback_data: sentDone ? `noop:${orderNumber}` : `sent:${orderNumber}`,
               },
-              { text: "💵 Cash", callback_data: `paid_cash:${orderNumber}` },
             ],
             [
+              { text: "💵 Cash", callback_data: `paid_cash:${orderNumber}` },
               { text: "🏦 Transfer", callback_data: `paid_transfer:${orderNumber}` },
               { text: "💳 POS", callback_data: `paid_pos:${orderNumber}` },
             ],
@@ -133,6 +135,72 @@ async function handleStart(chatId: string) {
       ],
     },
   });
+}
+
+function formatCurrency(n: number) {
+  return `₦${n.toLocaleString()}`;
+}
+
+async function handleSummary(chatId: string) {
+  const now = new Date();
+  const from = new Date(now);
+  from.setHours(0, 0, 0, 0);
+  const to = new Date(now);
+  to.setHours(23, 59, 59, 999);
+
+  const orders = await prisma.order.findMany({
+    where: {
+      createdAt: {
+        gte: from,
+        lte: to,
+      },
+    },
+    select: {
+      totalAmount: true,
+      paymentStatus: true,
+      paymentMethod: true,
+    },
+  });
+
+  const total = orders.reduce((sum, o) => sum + o.totalAmount, 0);
+  const paid = orders.filter((o) => o.paymentStatus === "PAID");
+  const unpaid = orders.filter((o) => o.paymentStatus !== "PAID");
+
+  const cash = paid
+    .filter((o) => o.paymentMethod === "CASH")
+    .reduce((sum, o) => sum + o.totalAmount, 0);
+
+  const transfer = paid
+    .filter((o) => o.paymentMethod === "TRANSFER")
+    .reduce((sum, o) => sum + o.totalAmount, 0);
+
+  const pos = paid
+    .filter((o) => o.paymentMethod === "POS")
+    .reduce((sum, o) => sum + o.totalAmount, 0);
+
+  const unknown = paid
+    .filter((o) => !o.paymentMethod)
+    .reduce((sum, o) => sum + o.totalAmount, 0);
+
+  const paidTotal = paid.reduce((sum, o) => sum + o.totalAmount, 0);
+  const unpaidTotal = unpaid.reduce((sum, o) => sum + o.totalAmount, 0);
+
+  const message = [
+    "📊 Today’s Sales",
+    "",
+    `Total Orders: ${orders.length}`,
+    `Total Revenue: ${formatCurrency(total)}`,
+    "",
+    `💵 Cash: ${formatCurrency(cash)}`,
+    `🏦 Transfer: ${formatCurrency(transfer)}`,
+    `💳 POS: ${formatCurrency(pos)}`,
+    `❔ Unknown: ${formatCurrency(unknown)}`,
+    "",
+    `✅ Paid: ${formatCurrency(paidTotal)}`,
+    `⏳ Unpaid: ${formatCurrency(unpaidTotal)}`,
+  ].join("\n");
+
+  await sendMessage(chatId, message);
 }
 
 async function handleSentCommand(chatId: string, text: string) {
@@ -188,6 +256,8 @@ async function handleSentCallback(
   messageId: number,
   orderNumber: string
 ) {
+  await answerCallbackQuery(callbackQueryId, "Processing...");
+
   const result = await prisma.order.updateMany({
     where: { orderNumber, status: "PENDING" },
     data: { status: "PREPARING" },
@@ -234,6 +304,8 @@ async function handlePaidCallback(
   orderNumber: string,
   paymentMethod: "CASH" | "TRANSFER" | "POS"
 ) {
+  await answerCallbackQuery(callbackQueryId, "Processing...");
+
   const result = await prisma.order.updateMany({
     where: { orderNumber, paymentStatus: "UNPAID" },
     data: {
@@ -276,7 +348,7 @@ async function handlePaidCallback(
   if (order.staffUser.telegramUserId !== chatId) {
     await sendMessage(
       order.staffUser.telegramUserId,
-      `✅ Payment received\n\nOrder: ${order.orderNumber}\nTable: ${order.tableNumber || "N/A"}`
+      `✅ ${paymentLabel(paymentMethod)} received\n\nOrder: ${order.orderNumber}\nTable: ${order.tableNumber || "N/A"}`
     );
   }
 }
@@ -294,6 +366,11 @@ export async function POST(req: Request) {
 
       if (text === "/start") {
         await handleStart(chatId);
+        return NextResponse.json({ ok: true });
+      }
+
+      if (text === "/summary") {
+        await handleSummary(chatId);
         return NextResponse.json({ ok: true });
       }
 
