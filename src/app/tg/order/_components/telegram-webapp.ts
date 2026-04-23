@@ -13,6 +13,7 @@ export type TelegramWebApp = {
   };
   ready?: () => void;
   expand?: () => void;
+  close?: () => void;
 };
 
 declare global {

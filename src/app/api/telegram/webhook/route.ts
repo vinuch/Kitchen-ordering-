@@ -115,15 +115,31 @@ async function editInlineButtons(
 }
 
 async function handleStart(chatId: string) {
+  const url = `${process.env.NEXT_PUBLIC_APP_URL}/tg/order?v=8`;
+
   await sendMessage(chatId, "Welcome to Kitchen Bot 👨‍🍳", {
+    reply_markup: {
+      keyboard: [
+        [
+          {
+            text: "📝 New Order",
+            web_app: { url },
+          },
+        ],
+      ],
+      resize_keyboard: true,
+      is_persistent: true,
+      one_time_keyboard: false,
+    },
+  });
+
+  await sendMessage(chatId, "Or use the inline button below:", {
     reply_markup: {
       inline_keyboard: [
         [
           {
             text: "📝 New Order",
-            web_app: {
-              url: `${process.env.NEXT_PUBLIC_APP_URL}/tg/order?v=7`,
-            },
+            web_app: { url },
           },
         ],
         [

@@ -186,6 +186,12 @@ export default function TelegramOrderPage() {
       setCart([]);
       setTableNumber("");
       setCartOpen(false);
+
+      const webApp = getTelegramWebApp();
+
+      window.setTimeout(() => {
+        webApp?.close?.();
+      }, 700);
     } catch (error) {
       setSubmitError(
         error instanceof Error ? error.message : "Failed to submit order"
