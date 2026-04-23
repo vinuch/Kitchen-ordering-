@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "db:seed": "tsx prisma/seed.ts",
-    "start:prod": "next start --hostname 0.0.0.0 --port 3000"
+    "start:prod": "next start --hostname 0.0.0.0 --port 3000",
+    "db:sync-menu": "tsx prisma/sync-menu.ts"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.7.0",
