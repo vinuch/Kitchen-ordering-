@@ -117,21 +117,7 @@ async function editInlineButtons(
 async function handleStart(chatId: string) {
   const url = `${process.env.NEXT_PUBLIC_APP_URL}/tg/order?v=9`;
 
-  await sendMessage(chatId, "Welcome to Kitchen Bot 👨‍🍳", {
-    reply_markup: {
-      keyboard: [
-        [
-          {
-            text: "📝 New Order",
-            web_app: { url },
-          },
-        ],
-      ],
-      resize_keyboard: true,
-      is_persistent: true,
-      one_time_keyboard: false,
-    },
-  });
+  await sendMessage(chatId, "Welcome to Kitchen Bot 👨‍🍳");
 
   await sendMessage(chatId, "Use the button below to open the Mini App.", {
     reply_markup: {
@@ -440,6 +426,15 @@ export async function POST(req: Request) {
     if (message?.text) {
       const chatId = String(message.chat.id);
       const text = message.text.trim();
+
+      if (text === "/clearkb") {
+        await sendMessage(chatId, "Keyboard cleared", {
+          reply_markup: {
+            remove_keyboard: true,
+          },
+        });
+        return NextResponse.json({ ok: true });
+      }
 
       if (text === "/start") {
         await handleStart(chatId);
