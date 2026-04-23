@@ -194,10 +194,47 @@ async function handleSummary(chatId: string) {
     `💵 Cash: ${formatCurrency(cash)}`,
     `🏦 Transfer: ${formatCurrency(transfer)}`,
     `💳 POS: ${formatCurrency(pos)}`,
-    `❔ Unknown: ${formatCurrency(unknown)}`,
+    `${unknown > 0 ? "⚠️" : "❔"} Unknown: ${formatCurrency(unknown)}`,
     "",
     `✅ Paid: ${formatCurrency(paidTotal)}`,
     `⏳ Unpaid: ${formatCurrency(unpaidTotal)}`,
+  ].join("\n");
+
+  await sendMessage(chatId, message);
+}
+
+async function handleUnpaid(chatId: string) {
+  const orders = await prisma.order.findMany({
+    where: {
+      paymentStatus: "UNPAID",
+    },
+    select: {
+      orderNumber: true,
+      tableNumber: true,
+      totalAmount: true,
+      createdAt: true,
+      status: true,
+    },
+    orderBy: {
+      createdAt: "asc",
+    },
+    take: 10,
+  });
+
+  if (orders.length === 0) {
+    await sendMessage(chatId, "✅ No unpaid orders.");
+    return;
+  }
+
+  const message = [
+    "⏳ Unpaid Orders",
+    "",
+    ...orders.map(
+      (o) =>
+        `${o.orderNumber} — Table ${o.tableNumber || "N/A"} — ${formatCurrency(
+          o.totalAmount
+        )} — ${o.status}`
+    ),
   ].join("\n");
 
   await sendMessage(chatId, message);
@@ -371,6 +408,11 @@ export async function POST(req: Request) {
 
       if (text === "/summary") {
         await handleSummary(chatId);
+        return NextResponse.json({ ok: true });
+      }
+
+      if (text === "/unpaid") {
+        await handleUnpaid(chatId);
         return NextResponse.json({ ok: true });
       }
 
