@@ -81,7 +81,7 @@ export default function OrderActions({
 
       {paymentStatus === "UNPAID" && (
         <button
-          onClick={() => updateOrder({ paymentStatus: "PAID" })}
+          onClick={() => {}} disabled title="Use Telegram payment buttons for now"
           disabled={isPending}
           style={{
             padding: "10px 14px",
