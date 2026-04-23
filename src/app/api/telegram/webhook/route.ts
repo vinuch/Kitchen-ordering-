@@ -582,7 +582,6 @@ export async function POST(req: Request) {
       }
     }
 
-    const callbackQuery = body.callback_query;
 
     if (message?.text) {
       const chatId = String(message.chat.id);
