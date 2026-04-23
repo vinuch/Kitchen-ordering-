@@ -115,11 +115,9 @@ async function editInlineButtons(
 }
 
 async function handleStart(chatId: string) {
-  const url = `${process.env.NEXT_PUBLIC_APP_URL}/tg/order?v=9`;
+  const url = `${process.env.NEXT_PUBLIC_APP_URL}/tg/order?v=10`;
 
-  await sendMessage(chatId, "Welcome to Kitchen Bot 👨‍🍳");
-
-  await sendMessage(chatId, "Use the button below to open the Mini App.", {
+  await sendMessage(chatId, "Welcome to Kitchen Bot 👨‍🍳", {
     reply_markup: {
       inline_keyboard: [
         [
