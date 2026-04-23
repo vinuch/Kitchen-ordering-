@@ -117,6 +117,9 @@ model Order {
   status         OrderStatus   @default(PENDING)
   paymentStatus  PaymentStatus @default(UNPAID)
   paymentMethod  PaymentMethod?
+  assignedChefTelegramUserId String?
+  assignedChefName           String?
+  assignedAt                DateTime?
   subtotalAmount Int
   totalAmount    Int
   notes          String?
@@ -130,6 +133,7 @@ model Order {
   @@index([status])
   @@index([paymentStatus])
   @@index([paymentMethod])
+  @@index([assignedChefTelegramUserId])
   @@index([staffUserId])
   @@index([tableNumber])
 }
