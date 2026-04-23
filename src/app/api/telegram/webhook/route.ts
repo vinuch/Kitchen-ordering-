@@ -56,6 +56,21 @@ function paymentLabel(method: string | null | undefined) {
   return "💰 Paid";
 }
 
+function chefActions(orderNumber: string) {
+  return {
+    reply_markup: {
+      inline_keyboard: [
+        [
+          {
+            text: "👨‍🍳 Accept Order",
+            callback_data: `accept:${orderNumber}`,
+          },
+        ],
+      ],
+    },
+  };
+}
+
 function actionKeyboard(
   orderNumber: string,
   status: string,
@@ -114,6 +129,80 @@ async function editInlineButtons(
   });
 }
 
+function formatCurrency(n: number) {
+  return `₦${n.toLocaleString()}`;
+}
+
+function buildChefMessage(order: {
+  orderNumber: string;
+  tableNumber: string | null;
+  totalAmount: number;
+  items: Array<{
+    quantity: number;
+    menuItemNameSnapshot: string;
+    modifiers: Array<{
+      modifierGroupNameSnapshot: string;
+      modifierOptionNameSnapshot: string;
+      quantity: number;
+    }>;
+  }>;
+}) {
+  const lines =
+    order.items?.map((item) => {
+      const base = `- ${item.quantity}x ${item.menuItemNameSnapshot}`;
+      if (!item.modifiers.length) return base;
+
+      const mods = item.modifiers
+        .map(
+          (m) =>
+            `  • ${m.modifierGroupNameSnapshot}: ${m.modifierOptionNameSnapshot} x${m.quantity}`
+        )
+        .join("\n");
+
+      return `${base}\n${mods}`;
+    }) ?? [];
+
+  return [
+    "👨‍🍳 Kitchen Order",
+    "",
+    "⚡ First to accept gets the order",
+    "",
+    `Order: ${order.orderNumber}`,
+    `Table: ${order.tableNumber || "N/A"}`,
+    `Total: ${formatCurrency(order.totalAmount)}`,
+    "",
+    ...lines,
+  ].join("\n");
+}
+
+async function notifyChefsForOrder(orderNumber: string) {
+  const chefIds = (process.env.CHEF_CHAT_IDS ?? "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  if (!chefIds.length) return;
+
+  const order = await prisma.order.findUnique({
+    where: { orderNumber },
+    include: {
+      items: {
+        include: {
+          modifiers: true,
+        },
+      },
+    },
+  });
+
+  if (!order) return;
+
+  const chefMsg = buildChefMessage(order);
+
+  for (const chefId of chefIds) {
+    await sendMessage(chefId, chefMsg, chefActions(order.orderNumber));
+  }
+}
+
 async function handleStart(chatId: string) {
   const url = `${process.env.NEXT_PUBLIC_APP_URL}/tg/order?v=10`;
 
@@ -129,10 +218,6 @@ async function handleStart(chatId: string) {
       ],
     },
   });
-}
-
-function formatCurrency(n: number) {
-  return `₦${n.toLocaleString()}`;
 }
 
 async function handleSummary(chatId: string) {
@@ -206,7 +291,6 @@ async function handleUnpaid(chatId: string) {
       orderNumber: true,
       tableNumber: true,
       totalAmount: true,
-      createdAt: true,
       status: true,
     },
     orderBy: {
@@ -303,6 +387,8 @@ async function handleSentCommand(chatId: string, text: string) {
     `✅ Order sent to kitchen\n\nOrder: ${order.orderNumber}\nTable: ${order.tableNumber || "N/A"}`
   );
 
+  await notifyChefsForOrder(orderNumber);
+
   if (order.staffUser.telegramUserId !== chatId) {
     await sendMessage(
       order.staffUser.telegramUserId,
@@ -348,6 +434,8 @@ async function handleSentCallback(
     order.paymentMethod
   );
 
+  await notifyChefsForOrder(orderNumber);
+
   await answerCallbackQuery(callbackQueryId, "Order sent to kitchen");
 
   if (order.staffUser.telegramUserId !== chatId) {
@@ -356,6 +444,52 @@ async function handleSentCallback(
       `👨‍🍳 Your order is now being prepared\n\nOrder: ${order.orderNumber}\nTable: ${order.tableNumber || "N/A"}`
     );
   }
+}
+
+async function handleAcceptCallback(
+  callbackQueryId: string,
+  chatId: string,
+  messageId: number,
+  orderNumber: string,
+  telegramUser: { id?: number; username?: string; first_name?: string }
+) {
+  await answerCallbackQuery(callbackQueryId, "Processing...");
+
+  const chefId = telegramUser.id ? String(telegramUser.id) : null;
+  const chefName = telegramUser.username
+    ? `@${telegramUser.username}`
+    : telegramUser.first_name || "Unknown";
+
+  if (!chefId) {
+    await answerCallbackQuery(callbackQueryId, "Could not identify chef");
+    return;
+  }
+
+  const result = await prisma.order.updateMany({
+    where: {
+      orderNumber,
+      status: "PREPARING",
+      assignedChefTelegramUserId: null,
+    },
+    data: {
+      assignedChefTelegramUserId: chefId,
+      assignedChefName: chefName,
+      assignedAt: new Date(),
+    },
+  });
+
+  if (result.count === 0) {
+    await answerCallbackQuery(callbackQueryId, "❌ Already taken");
+    return;
+  }
+
+  await tgCall("editMessageText", {
+    chat_id: chatId,
+    message_id: messageId,
+    text: `👨‍🍳 Order accepted\n\nOrder: ${orderNumber}\nAssigned to ${chefName}`,
+  });
+
+  await answerCallbackQuery(callbackQueryId, "✅ You accepted this order");
 }
 
 async function handlePaidCallback(
@@ -425,15 +559,6 @@ export async function POST(req: Request) {
       const chatId = String(message.chat.id);
       const text = message.text.trim();
 
-      if (text === "/clearkb") {
-        await sendMessage(chatId, "Keyboard cleared", {
-          reply_markup: {
-            remove_keyboard: true,
-          },
-        });
-        return NextResponse.json({ ok: true });
-      }
-
       if (text === "/start") {
         await handleStart(chatId);
         return NextResponse.json({ ok: true });
@@ -474,6 +599,18 @@ export async function POST(req: Request) {
       if (data.startsWith("sent:")) {
         const orderNumber = data.replace("sent:", "");
         await handleSentCallback(callbackQueryId, chatId, messageId, orderNumber);
+        return NextResponse.json({ ok: true });
+      }
+
+      if (data.startsWith("accept:")) {
+        const orderNumber = data.replace("accept:", "");
+        await handleAcceptCallback(
+          callbackQueryId,
+          chatId,
+          messageId,
+          orderNumber,
+          callbackQuery.from
+        );
         return NextResponse.json({ ok: true });
       }
 
