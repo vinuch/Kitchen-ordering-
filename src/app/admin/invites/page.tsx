@@ -88,12 +88,20 @@ export default async function AdminInvitesPage() {
                   className="mt-3 w-full rounded border border-gray-300 px-3 py-2 text-xs text-black"
                 />
 
-                <a
-                  href={`https://wa.me/?text=${encodeURIComponent(url)}`}
-                  className="mt-3 inline-block rounded bg-green-700 px-3 py-2 text-sm font-semibold text-white"
-                >
-                  Share WhatsApp
-                </a>
+                <div className="mt-3 flex gap-2">
+                  <a
+                    href={`https://wa.me/?text=${encodeURIComponent(url)}`}
+                    className="inline-block rounded bg-green-700 px-3 py-2 text-sm font-semibold text-white"
+                  >
+                    Share WhatsApp
+                  </a>
+
+                  <form action={`/api/admin/invites/${invite.id}/revoke`} method="POST">
+                    <button className="rounded bg-red-600 px-3 py-2 text-sm font-semibold text-white">
+                      Revoke
+                    </button>
+                  </form>
+                </div>
               </div>
             );
           })}
