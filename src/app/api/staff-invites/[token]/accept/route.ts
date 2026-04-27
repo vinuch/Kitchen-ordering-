@@ -17,70 +17,90 @@ export async function POST(
     redirect(`/join/${token}?error=invalid`);
   }
 
-  const invite = await prisma.staffInvite.findUnique({
-    where: { token },
-  });
+  try {
+    const pinHash = await bcrypt.hash(pin, 10);
 
-  if (
-    !invite ||
-    invite.usedAt ||
-    invite.revokedAt ||
-    (invite.expiresAt && invite.expiresAt < new Date())
-  ) {
-    redirect("/join/invalid");
+    const staff = await prisma.$transaction(async (tx) => {
+      const invite = await tx.staffInvite.findUnique({
+        where: { token },
+      });
+
+      if (
+        !invite ||
+        invite.usedAt ||
+        invite.revokedAt ||
+        (invite.expiresAt && invite.expiresAt < new Date())
+      ) {
+        return null;
+      }
+
+      const existingStaff = await tx.staffUser.findFirst({
+        where: {
+          firstName: {
+            equals: name,
+            mode: "insensitive",
+          },
+        },
+      });
+
+      if (existingStaff) {
+        throw new Error("DUPLICATE_STAFF_NAME");
+      }
+
+      const staffCount = await tx.staffUser.count();
+      const staffCode = `S${String(staffCount + 1).padStart(3, "0")}`;
+
+      const created = await tx.staffUser.create({
+        data: {
+          telegramUserId: `web:${token}`,
+          staffCode,
+          firstName: name,
+          lastName: null,
+          username: null,
+          pinHash,
+          isActive: true,
+        },
+      });
+
+      await tx.staffInvite.update({
+        where: { token },
+        data: {
+          usedAt: new Date(),
+          usedByStaffUserId: created.id,
+        },
+      });
+
+      return created;
+    });
+
+    if (!staff) {
+      redirect("/join/invalid");
+    }
+
+    const cookieStore = await cookies();
+
+    cookieStore.set("staff_user_id", staff.id, {
+      httpOnly: true,
+      secure: true,
+      sameSite: "lax",
+      path: "/",
+      maxAge: 60 * 60 * 24 * 30,
+    });
+
+    cookieStore.set("staff_name", staff.firstName, {
+      httpOnly: false,
+      secure: true,
+      sameSite: "lax",
+      path: "/",
+      maxAge: 60 * 60 * 24 * 30,
+    });
+
+    redirect("/my-orders");
+  } catch (error) {
+    if (error instanceof Error && error.message === "DUPLICATE_STAFF_NAME") {
+      redirect(`/join/${token}?error=duplicate`);
+    }
+
+    throw error;
   }
-
-  const existingStaff = await prisma.staffUser.findFirst({
-    where: {
-      firstName: {
-        equals: name,
-        mode: "insensitive",
-      },
-    },
-  });
-
-  if (existingStaff) {
-    redirect(`/join/${token}?error=duplicate`);
-  }
-
-  const staffCount = await prisma.staffUser.count();
-  const staffCode = `S${String(staffCount + 1).padStart(3, "0")}`;
-
-  const staff = await prisma.staffUser.create({
-    data: {
-      telegramUserId: `web:${token}`,
-      staffCode,
-      firstName: name,
-      username: null,
-      pinHash: await bcrypt.hash(pin, 10),
-      isActive: true,
-    },
-  });
-
-  await prisma.staffInvite.update({
-    where: { token },
-    data: {
-      usedAt: new Date(),
-      usedByStaffUserId: staff.id,
-    },
-  });
-
-  const cookieStore = await cookies();
-
-  cookieStore.set("staff_user_id", staff.id, {
-    httpOnly: true,
-    secure: true,
-    sameSite: "lax",
-    path: "/",
-    maxAge: 60 * 60 * 24 * 30,
-  });
-
-  cookieStore.set("staff_name", staff.firstName, {
-    httpOnly: false,
-    sameSite: "lax",
-    path: "/",
-    maxAge: 60 * 60 * 24 * 30,
-  });
-
-  redirect("/my-orders");
 }
