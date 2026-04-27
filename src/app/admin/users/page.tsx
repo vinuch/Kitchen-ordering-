@@ -49,9 +49,20 @@ export default async function AdminUsersPage() {
                     <div className="rounded bg-gray-100 px-2 py-1 text-xs text-gray-700">
                       {user.isActive ? "Active" : "Inactive"}
                     </div>
+
                     <div className="mt-2 text-sm font-semibold">
                       {user.orders.length} recent orders
                     </div>
+
+                    <form action={`/api/admin/users/${user.id}/toggle-active`} method="POST" className="mt-2">
+                      <button
+                        className={`rounded px-3 py-2 text-sm font-semibold ${
+                          user.isActive ? "bg-red-600 text-white" : "bg-green-600 text-white"
+                        }`}
+                      >
+                        {user.isActive ? "Deactivate" : "Reactivate"}
+                      </button>
+                    </form>
                   </div>
                 </div>
 
