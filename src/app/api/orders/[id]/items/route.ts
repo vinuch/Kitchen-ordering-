@@ -34,6 +34,10 @@ export async function PATCH(
     return NextResponse.json({ ok: false, error: "Order not found" }, { status: 404 });
   }
 
+  if (order.paymentStatus === "PAID") {
+    return NextResponse.json({ ok: false, error: "Paid orders cannot be edited" }, { status: 403 });
+  }
+
   const lines = (body.lines ?? []) as LineInput[];
   const tableNumber = String(body.tableNumber ?? "").trim();
 

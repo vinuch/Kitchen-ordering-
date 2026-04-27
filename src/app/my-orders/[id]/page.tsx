@@ -62,6 +62,7 @@ async function updateOrder(formData: FormData) {
   });
 
   if (!order) redirect("/my-orders");
+  if (order.paymentStatus === "PAID") redirect(`/my-orders/${orderId}`);
 
   await prisma.order.update({
     where: { id: orderId },
@@ -87,6 +88,7 @@ async function addItemToOrder(formData: FormData) {
   });
 
   if (!order) redirect("/my-orders");
+  if (order.paymentStatus === "PAID") redirect(`/my-orders/${orderId}`);
 
   const menuItem = await prisma.menuItem.findFirst({
     where: { id: menuItemId, isActive: true },
@@ -125,6 +127,7 @@ async function removeItemFromOrder(formData: FormData) {
   });
 
   if (!order) redirect("/my-orders");
+  if (order.paymentStatus === "PAID") redirect(`/my-orders/${orderId}`);
 
   await prisma.orderItem.delete({
     where: { id: orderItemId },
