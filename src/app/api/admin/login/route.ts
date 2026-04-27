@@ -17,6 +17,7 @@ export async function POST(req: Request) {
 
   cookieStore.set("admin_auth", "1", {
     httpOnly: true,
+    secure: true,
     sameSite: "lax",
     path: "/",
     maxAge: 60 * 60 * 12,

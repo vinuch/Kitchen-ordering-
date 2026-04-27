@@ -30,6 +30,7 @@ export async function POST(req: Request) {
 
   cookieStore.set("staff_user_id", staff.id, {
     httpOnly: true,
+    secure: true,
     sameSite: "lax",
     path: "/",
     maxAge: 60 * 60 * 24 * 30,

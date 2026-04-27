@@ -187,11 +187,7 @@ export default function TelegramOrderPage() {
   }, [cart]);
 
   async function handleSubmitOrder() {
-    const hasWebStaffCookie =
-      typeof document !== "undefined" &&
-      document.cookie.includes("staff_user_id=");
-
-    if ((!telegramUser?.id || !telegramUser.initData) && !hasWebStaffCookie) {
+    if (!telegramUser?.id || !telegramUser.initData) {
       setSubmitError("Join with an invite link before submitting an order");
       return;
     }

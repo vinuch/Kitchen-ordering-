@@ -62,7 +62,8 @@ export async function POST(
   const cookieStore = await cookies();
 
   cookieStore.set("staff_user_id", staff.id, {
-    httpOnly: false,
+    httpOnly: true,
+    secure: true,
     sameSite: "lax",
     path: "/",
     maxAge: 60 * 60 * 24 * 30,
