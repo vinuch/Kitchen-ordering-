@@ -20,7 +20,12 @@ export async function POST(
     where: { token },
   });
 
-  if (!invite || invite.revokedAt || (invite.expiresAt && invite.expiresAt < new Date())) {
+  if (
+    !invite ||
+    invite.usedAt ||
+    invite.revokedAt ||
+    (invite.expiresAt && invite.expiresAt < new Date())
+  ) {
     redirect("/join/invalid");
   }
 
@@ -37,14 +42,8 @@ export async function POST(
     redirect(`/join/${token}?error=duplicate`);
   }
 
-  const staff = await prisma.staffUser.upsert({
-    where: { telegramUserId: `web:${token}` },
-    update: {
-      firstName: name,
-      username: `pin:${pin}`,
-      isActive: true,
-    },
-    create: {
+  const staff = await prisma.staffUser.create({
+    data: {
       telegramUserId: `web:${token}`,
       firstName: name,
       username: `pin:${pin}`,
