@@ -16,7 +16,7 @@ export async function POST(req: Request) {
     },
   });
 
-  if (!staff) {
+  if (!staff || !staff.isActive) {
     redirect("/login?error=invalid");
   }
 

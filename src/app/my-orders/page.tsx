@@ -20,6 +20,21 @@ export default async function MyOrdersPage() {
     );
   }
 
+  const staffUser = await prisma.staffUser.findUnique({
+    where: { id: staffUserId },
+  });
+
+  if (!staffUser || !staffUser.isActive) {
+    return (
+      <main className="min-h-screen bg-[#f7f7f7] p-6 text-black">
+        <div className="mx-auto max-w-md rounded-xl bg-white p-5 shadow-sm">
+          <h1 className="text-2xl font-bold">Account disabled</h1>
+          <p className="mt-2 text-sm text-gray-600">Ask an admin to reactivate your account.</p>
+        </div>
+      </main>
+    );
+  }
+
   const orders = await prisma.order.findMany({
     where: { staffUserId },
     orderBy: { createdAt: "desc" },

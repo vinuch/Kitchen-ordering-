@@ -147,7 +147,7 @@ export async function POST(req: Request) {
       });
 
       if (!staffUser || !staffUser.isActive) {
-        return NextResponse.json({ ok: false, error: "Not authorized" }, { status: 403 });
+        return NextResponse.json({ ok: false, error: "Account disabled" }, { status: 403 });
       }
 
       orderUser = {
