@@ -499,6 +499,11 @@ async function handleAcceptCallback(
     chat_id: chatId,
     message_id: messageId,
     text: `👨‍🍳 Order accepted\n\nOrder: ${orderNumber}\nAssigned to ${chefName}`,
+    reply_markup: {
+      inline_keyboard: [
+        [{ text: "✅ Order Sent Out / Completed", callback_data: `complete:${orderNumber}` }],
+      ],
+    },
   });
 
   await answerCallbackQuery(callbackQueryId, "✅ You accepted this order");
@@ -559,6 +564,61 @@ async function handlePaidCallback(
     );
   }
 }
+
+async function handleCompleteCallback(
+  callbackQueryId: string,
+  chatId: string,
+  messageId: number,
+  orderNumber: string
+) {
+  await answerCallbackQuery(callbackQueryId, "Processing...");
+
+  const result = await prisma.order.updateMany({
+    where: {
+      orderNumber,
+      status: { not: "COMPLETED" },
+    },
+    data: { status: "COMPLETED" },
+  });
+
+  const order = await prisma.order.findUnique({
+    where: { orderNumber },
+    include: { staffUser: true },
+  });
+
+  if (!order) {
+    await answerCallbackQuery(callbackQueryId, "Order not found");
+    return;
+  }
+
+  if (result.count === 0) {
+    await answerCallbackQuery(callbackQueryId, "Order already completed");
+    return;
+  }
+
+  await tgCall("editMessageReplyMarkup", {
+    chat_id: chatId,
+    message_id: messageId,
+    reply_markup: {
+      inline_keyboard: [[{ text: "✅ Completed", callback_data: `noop:${orderNumber}` }]],
+    },
+  });
+
+  await sendMessage(
+    chatId,
+    `✅ Order completed\n\nOrder: ${order.orderNumber}\nTable: ${order.tableNumber || "N/A"}`
+  );
+
+  if (order.staffUser.telegramUserId && order.staffUser.telegramUserId !== chatId) {
+    await sendMessage(
+      order.staffUser.telegramUserId,
+      `✅ Order completed\n\nOrder: ${order.orderNumber}\nTable: ${order.tableNumber || "N/A"}`
+    );
+  }
+
+  await answerCallbackQuery(callbackQueryId, "Order completed");
+}
+
 
 export async function POST(req: Request) {
   try {
@@ -639,6 +699,12 @@ export async function POST(req: Request) {
           orderNumber,
           callbackQuery.from
         );
+        return NextResponse.json({ ok: true });
+      }
+
+      if (data.startsWith("complete:")) {
+        const orderNumber = data.replace("complete:", "");
+        await handleCompleteCallback(callbackQueryId, chatId, messageId, orderNumber);
         return NextResponse.json({ ok: true });
       }
 
