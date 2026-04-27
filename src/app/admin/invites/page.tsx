@@ -17,7 +17,7 @@ export default async function AdminInvitesPage() {
           <div
             key={invite.id}
             className={`rounded-xl border p-4 shadow-sm ${
-              invite.isActive
+              (!invite.revokedAt && (!invite.expiresAt || invite.expiresAt > new Date()))
                 ? "border-gray-200 bg-white"
                 : "border-red-200 bg-red-50 opacity-70"
             }`}
@@ -33,7 +33,7 @@ export default async function AdminInvitesPage() {
                 </div>
 
                 <div className="text-xs font-semibold">
-                  {invite.isActive ? "Accepted" : "Revoked"}
+                  {(!invite.revokedAt && (!invite.expiresAt || invite.expiresAt > new Date())) ? "Accepted" : "Revoked"}
                 </div>
               </div>
 
@@ -63,7 +63,7 @@ export default async function AdminInvitesPage() {
 
               <form action={`/api/admin/invites/${invite.id}/revoke`} method="POST">
                 <button
-                  disabled={!invite.isActive}
+                  disabled={!(!invite.revokedAt && (!invite.expiresAt || invite.expiresAt > new Date()))}
                   className="rounded bg-red-600 px-3 py-2 text-sm font-semibold text-white disabled:opacity-50"
                 >
                   Revoke
