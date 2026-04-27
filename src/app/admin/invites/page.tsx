@@ -2,6 +2,7 @@ export const dynamic = "force-dynamic";
 
 import { prisma } from "@/lib/prisma";
 import crypto from "crypto";
+import { CopyButton } from "./copy-button";
 
 async function createInvite(formData: FormData) {
   "use server";
