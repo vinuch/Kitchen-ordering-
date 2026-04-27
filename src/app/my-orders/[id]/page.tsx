@@ -82,8 +82,7 @@ async function markPaid(formData: FormData) {
     `Total: ₦${order.totalAmount.toLocaleString()}`,
     "",
     "Confirm payment below.",
-  ].join("
-");
+  ].join("\n");
 
   for (const opId of operatorIds) {
     await sendTelegramMessage(opId, message, {
