@@ -242,6 +242,8 @@ export default async function OrderDetailPage({
   }
 
   const canEdit = order.paymentStatus !== "PAID";
+const isPaymentRequested = !!order.paymentMethod && order.paymentStatus !== "PAID";
+
 
   return (
     <main className="min-h-screen bg-[#f7f7f7] p-4 pb-24 text-black">
@@ -345,6 +347,10 @@ export default async function OrderDetailPage({
             Add Item
           </button>
         </form>
+        ) : isPaymentRequested ? (
+          <div className="mt-3 rounded-lg bg-yellow-100 px-4 py-3 text-center text-sm font-semibold text-yellow-800">
+            Awaiting operator confirmation...
+          </div>
         ) : null}
 
         {order.paymentStatus !== "PAID" ? (
@@ -366,6 +372,10 @@ export default async function OrderDetailPage({
               Request Payment Confirmation
             </button>
           </form>
+        ) : isPaymentRequested ? (
+          <div className="mt-3 rounded-lg bg-yellow-100 px-4 py-3 text-center text-sm font-semibold text-yellow-800">
+            Awaiting operator confirmation...
+          </div>
         ) : null}
 
         <section className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
