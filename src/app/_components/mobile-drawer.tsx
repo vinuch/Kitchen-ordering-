@@ -17,7 +17,7 @@ export function MobileDrawer({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="fixed left-4 top-4 z-50 rounded-full bg-black px-4 py-3 text-sm font-bold text-white shadow-lg"
+        className="fixed bottom-6 right-6 z-50 rounded-full bg-black px-4 py-3 text-sm font-bold text-white shadow-xl"
       >
         ☰
       </button>
