@@ -2,47 +2,23 @@ import { prisma } from "@/lib/prisma";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
-export async function POST(
-  req: Request,
-  { params }: { params: Promise<{ token: string }> }
-) {
-  const { token } = await params;
+export async function POST(req: Request) {
   const form = await req.formData();
 
   const name = String(form.get("name") ?? "").trim();
   const pin = String(form.get("pin") ?? "").trim();
 
-  if (!name || pin.length !== 4) {
-    redirect(`/join/${token}?error=invalid`);
-  }
-
-  const invite = await prisma.staffInvite.findUnique({
-    where: { token },
-  });
-
-  if (!invite) {
-    redirect("/join/invalid");
-  }
-
-  const staff = await prisma.staffUser.upsert({
-    where: { telegramUserId: `web:${token}` },
-    update: {
-      firstName: name,
-      username: `pin:${pin}`,
-      isActive: true,
-    },
-    create: {
-      telegramUserId: `web:${token}`,
+  const staff = await prisma.staffUser.findFirst({
+    where: {
       firstName: name,
       username: `pin:${pin}`,
       isActive: true,
     },
   });
 
-  await prisma.staffInvite.update({
-    where: { token },
-    data: { usedAt: new Date() },
-  });
+  if (!staff) {
+    redirect("/login?error=invalid");
+  }
 
   const cookieStore = await cookies();
 
