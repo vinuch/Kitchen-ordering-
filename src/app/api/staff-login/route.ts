@@ -6,17 +6,14 @@ import bcrypt from "bcryptjs";
 export async function POST(req: Request) {
   const form = await req.formData();
 
-  const name = String(form.get("name") ?? "").trim();
+  const staffCode = String(form.get("staffCode") ?? "").trim();
   const pin = String(form.get("pin") ?? "").trim();
 
-  const staff = await prisma.staffUser.findFirst({
-    where: {
-      firstName: name,
-      isActive: true,
-    },
+  const staff = await prisma.staffUser.findUnique({
+    where: { staffCode },
   });
 
-  if (!staff || !staff.pinHash) {
+  if (!staff || !staff.isActive || !staff.pinHash) {
     redirect("/login?error=invalid");
   }
 
@@ -31,13 +28,6 @@ export async function POST(req: Request) {
   cookieStore.set("staff_user_id", staff.id, {
     httpOnly: true,
     secure: true,
-    sameSite: "lax",
-    path: "/",
-    maxAge: 60 * 60 * 24 * 30,
-  });
-
-  cookieStore.set("staff_name", staff.firstName, {
-    httpOnly: false,
     sameSite: "lax",
     path: "/",
     maxAge: 60 * 60 * 24 * 30,

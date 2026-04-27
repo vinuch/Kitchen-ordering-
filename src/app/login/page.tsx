@@ -13,17 +13,17 @@ export default async function LoginPage({
 
         {hasError ? (
           <div className="mt-4 rounded-lg bg-red-50 p-3 text-sm font-semibold text-red-700">
-            Invalid name or PIN. Try again.
+            Invalid staff code or PIN. Try again.
           </div>
         ) : null}
 
         <form action="/api/staff-login" method="POST" className="mt-5 space-y-4">
           <div>
-            <label className="block text-sm font-semibold text-black">Name</label>
+            <label className="block text-sm font-semibold text-black">Staff Code</label>
             <input
-              name="name"
+              name="staffCode"
               required
-              autoComplete="name"
+              autoComplete="username"
               className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-black"
             />
           </div>
