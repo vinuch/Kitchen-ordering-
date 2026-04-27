@@ -60,5 +60,5 @@ export async function POST(
     maxAge: 60 * 60 * 24 * 30,
   });
 
-  redirect("/tg/order");
+  redirect("/my-orders");
 }
