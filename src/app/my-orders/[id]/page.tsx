@@ -63,9 +63,14 @@ async function markPaid(formData: FormData) {
 
   if (!order) redirect("/my-orders");
 
-  if (order.paymentStatus === "PAID") {
+  if (order.paymentStatus === "PAID" || order.paymentMethod) {
     redirect(`/my-orders/${orderId}`);
   }
+
+  await prisma.order.update({
+    where: { id: orderId },
+    data: { paymentMethod: paymentMethod as any },
+  });
 
   const operatorIds = (process.env.OPERATOR_CHAT_IDS ?? "")
     .split(",")
