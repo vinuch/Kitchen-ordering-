@@ -3,6 +3,22 @@ import { prisma } from "@/lib/prisma";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
+async function recalcOrderTotal(orderId: string) {
+  const items = await prisma.orderItem.findMany({
+    where: { orderId },
+  });
+
+  const total = items.reduce((sum, item) => sum + item.lineTotal, 0);
+
+  await prisma.order.update({
+    where: { id: orderId },
+    data: {
+      subtotalAmount: total,
+      totalAmount: total,
+    },
+  });
+}
+
 async function markPaid(formData: FormData) {
   "use server";
 
@@ -49,11 +65,72 @@ async function updateOrder(formData: FormData) {
 
   await prisma.order.update({
     where: { id: orderId },
+    data: { tableNumber, notes },
+  });
+
+  redirect(`/my-orders/${orderId}`);
+}
+
+async function addItemToOrder(formData: FormData) {
+  "use server";
+
+  const cookieStore = await cookies();
+  const staffUserId = cookieStore.get("staff_user_id")?.value;
+  const orderId = String(formData.get("orderId"));
+  const menuItemId = String(formData.get("menuItemId"));
+  const quantity = Math.max(1, Number(formData.get("quantity") || 1));
+
+  if (!staffUserId) redirect("/login");
+
+  const order = await prisma.order.findFirst({
+    where: { id: orderId, staffUserId },
+  });
+
+  if (!order) redirect("/my-orders");
+
+  const menuItem = await prisma.menuItem.findFirst({
+    where: { id: menuItemId, isActive: true },
+  });
+
+  if (!menuItem) redirect(`/my-orders/${orderId}`);
+
+  await prisma.orderItem.create({
     data: {
-      tableNumber,
-      notes,
+      orderId,
+      menuItemId: menuItem.id,
+      menuItemNameSnapshot: menuItem.name,
+      unitPriceSnapshot: menuItem.price,
+      quantity,
+      lineTotal: menuItem.price * quantity,
     },
   });
+
+  await recalcOrderTotal(orderId);
+
+  redirect(`/my-orders/${orderId}`);
+}
+
+async function removeItemFromOrder(formData: FormData) {
+  "use server";
+
+  const cookieStore = await cookies();
+  const staffUserId = cookieStore.get("staff_user_id")?.value;
+  const orderId = String(formData.get("orderId"));
+  const orderItemId = String(formData.get("orderItemId"));
+
+  if (!staffUserId) redirect("/login");
+
+  const order = await prisma.order.findFirst({
+    where: { id: orderId, staffUserId },
+  });
+
+  if (!order) redirect("/my-orders");
+
+  await prisma.orderItem.delete({
+    where: { id: orderItemId },
+  });
+
+  await recalcOrderTotal(orderId);
 
   redirect(`/my-orders/${orderId}`);
 }
@@ -70,16 +147,22 @@ export default async function OrderDetailPage({
 
   const { id } = await params;
 
-  const order = await prisma.order.findFirst({
-    where: { id, staffUserId },
-    include: {
-      items: {
-        include: {
-          modifiers: true,
+  const [order, menuItems] = await Promise.all([
+    prisma.order.findFirst({
+      where: { id, staffUserId },
+      include: {
+        items: {
+          include: {
+            modifiers: true,
+          },
         },
       },
-    },
-  });
+    }),
+    prisma.menuItem.findMany({
+      where: { isActive: true },
+      orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
+    }),
+  ]);
 
   if (!order) {
     return (
@@ -150,6 +233,39 @@ export default async function OrderDetailPage({
           </button>
         </form>
 
+        <form action={addItemToOrder} className="mb-4 rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+          <input type="hidden" name="orderId" value={order.id} />
+
+          <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-gray-700">
+            Add Item
+          </h2>
+
+          <label className="block text-sm font-semibold text-black">Menu Item</label>
+          <select
+            name="menuItemId"
+            className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-black"
+          >
+            {menuItems.map((item) => (
+              <option key={item.id} value={item.id}>
+                {item.name} — ₦{item.price.toLocaleString()}
+              </option>
+            ))}
+          </select>
+
+          <label className="mt-3 block text-sm font-semibold text-black">Quantity</label>
+          <input
+            name="quantity"
+            type="number"
+            min="1"
+            defaultValue="1"
+            className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-black"
+          />
+
+          <button className="mt-4 w-full rounded bg-black px-4 py-3 font-semibold text-white">
+            Add Item
+          </button>
+        </form>
+
         {order.paymentStatus !== "PAID" ? (
           <form action={markPaid} className="mb-4 rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
             <input type="hidden" name="orderId" value={order.id} />
@@ -197,6 +313,14 @@ export default async function OrderDetailPage({
                     ))}
                   </div>
                 ) : null}
+
+                <form action={removeItemFromOrder} className="mt-3">
+                  <input type="hidden" name="orderId" value={order.id} />
+                  <input type="hidden" name="orderItemId" value={item.id} />
+                  <button className="rounded bg-red-600 px-3 py-2 text-sm font-semibold text-white">
+                    Remove Item
+                  </button>
+                </form>
               </div>
             ))}
           </div>
