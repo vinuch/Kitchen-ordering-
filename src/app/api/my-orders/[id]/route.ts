@@ -55,12 +55,11 @@ export async function PATCH(
     return NextResponse.json({ ok: false, error: "Order not found" }, { status: 404 });
   }
 
-  const isOnlyMarkingPaid =
-    body.paymentStatus === "PAID" &&
-    body.tableNumber === undefined &&
-    body.notes === undefined;
+  if (body.paymentStatus !== undefined || body.paymentMethod !== undefined) {
+    return NextResponse.json({ ok: false, error: "Payment must be confirmed by operator" }, { status: 403 });
+  }
 
-  if (order.paymentStatus === "PAID" && !isOnlyMarkingPaid) {
+  if (order.paymentStatus === "PAID") {
     return NextResponse.json({ ok: false, error: "Paid orders cannot be edited" }, { status: 403 });
   }
 
@@ -69,8 +68,8 @@ export async function PATCH(
     data: {
       tableNumber: body.tableNumber !== undefined ? String(body.tableNumber) : undefined,
       notes: body.notes !== undefined ? String(body.notes) : undefined,
-      paymentStatus: body.paymentStatus === "PAID" ? "PAID" : undefined,
-      paymentMethod: body.paymentMethod ?? undefined,
+      paymentStatus: undefined,
+      paymentMethod: undefined,
     },
   });
 

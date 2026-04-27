@@ -3,6 +3,32 @@ import { prisma } from "@/lib/prisma";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
+async function sendTelegramMessage(
+  chatId: string,
+  text: string,
+  extra?: Record<string, unknown>
+) {
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+  if (!token) return;
+
+  await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      chat_id: chatId,
+      text,
+      ...(extra ?? {}),
+    }),
+  });
+}
+
+function paymentLabel(method: string) {
+  if (method === "TRANSFER") return "🏦 Transfer";
+  if (method === "POS") return "💳 POS";
+  return "💵 Cash";
+}
+
+
 async function recalcOrderTotal(orderId: string) {
   const items = await prisma.orderItem.findMany({
     where: { orderId },
@@ -24,6 +50,7 @@ async function markPaid(formData: FormData) {
 
   const cookieStore = await cookies();
   const staffUserId = cookieStore.get("staff_user_id")?.value;
+  const staffName = cookieStore.get("staff_name")?.value ?? "Staff";
   const orderId = String(formData.get("orderId"));
   const paymentMethod = String(formData.get("paymentMethod") || "CASH");
 
@@ -31,17 +58,52 @@ async function markPaid(formData: FormData) {
 
   const order = await prisma.order.findFirst({
     where: { id: orderId, staffUserId },
+    include: { items: { include: { modifiers: true } } },
   });
 
   if (!order) redirect("/my-orders");
 
-  await prisma.order.update({
-    where: { id: orderId },
-    data: {
-      paymentStatus: "PAID",
-      paymentMethod: paymentMethod as any,
-    },
-  });
+  if (order.paymentStatus === "PAID") {
+    redirect(`/my-orders/${orderId}`);
+  }
+
+  const operatorIds = (process.env.OPERATOR_CHAT_IDS ?? "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  const message = [
+    "🧾 Payment confirmation requested",
+    "",
+    `Order: ${order.orderNumber}`,
+    `Table: ${order.tableNumber || "N/A"}`,
+    `Waiter: ${staffName}`,
+    `Method: ${paymentLabel(paymentMethod)}`,
+    `Total: ₦${order.totalAmount.toLocaleString()}`,
+    "",
+    "Confirm payment below.",
+  ].join("
+");
+
+  for (const opId of operatorIds) {
+    await sendTelegramMessage(opId, message, {
+      reply_markup: {
+        inline_keyboard: [
+          [
+            {
+              text: `✅ Confirm ${paymentLabel(paymentMethod)}`,
+              callback_data:
+                paymentMethod === "TRANSFER"
+                  ? `paid_transfer:${order.orderNumber}`
+                  : paymentMethod === "POS"
+                    ? `paid_pos:${order.orderNumber}`
+                    : `paid_cash:${order.orderNumber}`,
+            },
+          ],
+        ],
+      },
+    });
+  }
 
   redirect(`/my-orders/${orderId}`);
 }
@@ -302,7 +364,7 @@ export default async function OrderDetailPage({
             </select>
 
             <button className="mt-4 w-full rounded bg-green-700 px-4 py-3 font-semibold text-white">
-              Mark as Paid
+              Request Payment Confirmation
             </button>
           </form>
         ) : null}
