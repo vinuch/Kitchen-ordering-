@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
 
 export async function POST() {
-  redirect("/orders/new");
+  redirect("/");
 }
