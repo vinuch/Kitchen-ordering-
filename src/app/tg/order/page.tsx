@@ -136,8 +136,12 @@ export default function TelegramOrderPage() {
   }, [cart]);
 
   async function handleSubmitOrder() {
-    if (!telegramUser?.id || !telegramUser.initData) {
-      setSubmitError("Open this page from Telegram to submit an order");
+    const hasWebStaffCookie =
+      typeof document !== "undefined" &&
+      document.cookie.includes("staff_user_id=");
+
+    if ((!telegramUser?.id || !telegramUser.initData) && !hasWebStaffCookie) {
+      setSubmitError("Join with an invite link before submitting an order");
       return;
     }
 
@@ -159,11 +163,11 @@ export default function TelegramOrderPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          telegramUserId: telegramUser.id,
-          firstName: telegramUser.firstName,
-          lastName: telegramUser.lastName,
-          username: telegramUser.username,
-          initData: telegramUser.initData,
+          telegramUserId: telegramUser?.id,
+          firstName: telegramUser?.firstName,
+          lastName: telegramUser?.lastName,
+          username: telegramUser?.username,
+          initData: telegramUser?.initData,
           tableNumber: tableNumber.trim(),
           lines: cart.map((line) => ({
             menuItemId: line.menuItemId,
