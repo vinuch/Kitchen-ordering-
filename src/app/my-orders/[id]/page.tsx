@@ -243,7 +243,6 @@ export default async function OrderDetailPage({
 
   const canEdit = order.paymentStatus !== "PAID";
   const isPaymentRequested = !!order.paymentMethod && order.paymentStatus !== "PAID";
-const isPaymentRequested = !!order.paymentMethod && order.paymentStatus !== "PAID";
 
 
   return (
