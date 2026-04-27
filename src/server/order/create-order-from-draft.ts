@@ -26,6 +26,7 @@ export async function createOrderFromDraft(input: CreateOrderFromDraftInput) {
     },
     create: {
       telegramUserId: input.telegramUserId,
+      staffCode: `TG-${input.telegramUserId}`,
       firstName: input.firstName ?? "Staff",
       lastName: input.lastName ?? null,
       username: input.username ?? null,

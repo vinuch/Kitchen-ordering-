@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import bcrypt from "bcryptjs";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
@@ -42,11 +43,16 @@ export async function POST(
     redirect(`/join/${token}?error=duplicate`);
   }
 
+  const staffCount = await prisma.staffUser.count();
+  const staffCode = `S${String(staffCount + 1).padStart(3, "0")}`;
+
   const staff = await prisma.staffUser.create({
     data: {
       telegramUserId: `web:${token}`,
+      staffCode,
       firstName: name,
-      username: `pin:${pin}`,
+      username: null,
+      pinHash: await bcrypt.hash(pin, 10),
       isActive: true,
     },
   });
