@@ -242,6 +242,7 @@ export default async function OrderDetailPage({
   }
 
   const canEdit = order.paymentStatus !== "PAID";
+  const isPaymentRequested = !!order.paymentMethod && order.paymentStatus !== "PAID";
 const isPaymentRequested = !!order.paymentMethod && order.paymentStatus !== "PAID";
 
 
@@ -353,7 +354,7 @@ const isPaymentRequested = !!order.paymentMethod && order.paymentStatus !== "PAI
           </div>
         ) : null}
 
-        {order.paymentStatus !== "PAID" ? (
+        {order.paymentStatus !== "PAID" && !isPaymentRequested ? (
           <form action={markPaid} className="mb-4 rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
             <input type="hidden" name="orderId" value={order.id} />
 
@@ -375,6 +376,10 @@ const isPaymentRequested = !!order.paymentMethod && order.paymentStatus !== "PAI
         ) : isPaymentRequested ? (
           <div className="mt-3 rounded-lg bg-yellow-100 px-4 py-3 text-center text-sm font-semibold text-yellow-800">
             Awaiting operator confirmation...
+          </div>
+        ) : isPaymentRequested ? (
+          <div className="mb-4 rounded-xl border border-yellow-200 bg-yellow-50 p-4 text-center text-sm font-semibold text-yellow-800 shadow-sm">
+            Awaiting operator confirmation for {order.paymentMethod}.
           </div>
         ) : null}
 
