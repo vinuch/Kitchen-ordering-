@@ -18,5 +18,5 @@ export async function POST(req: Request) {
     maxAge: 60 * 60 * 12,
   });
 
-  redirect("/admin");
+  redirect("/admin/invites");
 }

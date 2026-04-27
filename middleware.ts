@@ -20,7 +20,7 @@ export function middleware(req: NextRequest) {
 
   if (isAdminLogin && req.cookies.get("admin_auth")?.value === "1") {
     const url = req.nextUrl.clone();
-    url.pathname = "/admin";
+    url.pathname = "/admin/invites";
     return NextResponse.redirect(url);
   }
 
