@@ -44,6 +44,51 @@ export default function TelegramOrderPage() {
   }, []);
 
   useEffect(() => {
+    if (!editOrderId) return;
+
+    async function loadEditOrder() {
+      try {
+        const res = await fetch(`/api/my-orders/${editOrderId}`);
+        const json = await res.json();
+
+        if (!res.ok || !json.ok || !json.order) {
+          setSubmitError(json.error ?? "Failed to load order");
+          return;
+        }
+
+        setTableNumber(json.order.tableNumber ?? "");
+
+        setCart(
+          json.order.items
+            .filter((item: any) => item.menuItemId)
+            .map((item: any) => ({
+              id: item.id,
+              menuItemId: item.menuItemId,
+              menuItemName: item.menuItemNameSnapshot,
+              quantity: item.quantity,
+              basePrice: item.unitPriceSnapshot,
+              total: item.lineTotal,
+              selections: item.modifiers.map((m: any) => ({
+                modifierGroupId: "",
+                modifierGroupName: m.modifierGroupNameSnapshot,
+                modifierOptionId: m.modifierOptionId,
+                modifierOptionName: m.modifierOptionNameSnapshot,
+                priceDelta: m.priceDeltaSnapshot,
+                quantity: m.quantity,
+              })),
+            }))
+        );
+
+        setCartOpen(true);
+      } catch {
+        setSubmitError("Failed to load order");
+      }
+    }
+
+    loadEditOrder();
+  }, [editOrderId]);
+
+  useEffect(() => {
     const timer = window.setTimeout(() => {
       const webApp = getTelegramWebApp();
       if (!webApp?.initData) return;
