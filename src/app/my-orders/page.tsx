@@ -86,6 +86,12 @@ export default async function MyOrdersPage() {
     <main className="min-h-screen bg-[#f7f7f7] p-4 pb-24">
       <div className="mx-auto max-w-3xl">
         <div className="mb-4 flex items-center justify-between gap-3">
+<form action="/api/logout" method="POST">
+  <button className="rounded bg-red-600 px-4 py-2 text-sm font-semibold text-white">
+    Logout
+  </button>
+</form>
+
           <div>
             <h1 className="text-2xl font-bold text-black">My Orders</h1>
             <p className="text-sm text-gray-600">Ongoing and past orders</p>
