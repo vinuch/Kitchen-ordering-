@@ -5,7 +5,7 @@ import { useState } from "react";
 export function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
 
-  async function copy() {
+  async function handleCopy() {
     await navigator.clipboard.writeText(text);
     setCopied(true);
     setTimeout(() => setCopied(false), 1200);
@@ -14,7 +14,7 @@ export function CopyButton({ text }: { text: string }) {
   return (
     <button
       type="button"
-      onClick={copy}
+      onClick={handleCopy}
       className="rounded bg-gray-900 px-3 py-2 text-sm font-semibold text-white"
     >
       {copied ? "Copied" : "Copy"}
