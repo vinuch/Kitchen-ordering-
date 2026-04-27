@@ -38,7 +38,7 @@ export default async function MyOrdersPage() {
 
   function OrderCard({ order }: { order: any }) {
     return (
-      <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+      <Link href={`/my-orders/${order.id}`} className="block rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
         <div className="flex items-start justify-between gap-3">
           <div>
             <div className="font-bold text-black">{order.orderNumber}</div>
@@ -78,7 +78,7 @@ export default async function MyOrdersPage() {
             </div>
           ))}
         </div>
-      </div>
+      </Link>
     );
   }
 
