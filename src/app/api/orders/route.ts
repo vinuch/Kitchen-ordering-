@@ -1,3 +1,4 @@
+import { verifySameOrigin } from "@/lib/security/csrf";
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { prisma } from "@/lib/prisma";
@@ -120,6 +121,9 @@ function operatorActions(orderNumber: string) {
 }
 
 export async function POST(req: Request) {
+  const csrfError = await verifySameOrigin(req);
+  if (csrfError) return csrfError;
+
   try {
     const body = (await req.json()) as CreateOrderRequest;
 

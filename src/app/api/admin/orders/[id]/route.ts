@@ -1,3 +1,4 @@
+import { verifySameOrigin } from "@/lib/security/csrf";
 import { requireAdmin } from "@/lib/auth/admin";
 import { NextRequest, NextResponse } from "next/server";
 import { OrderStatus, PaymentStatus } from "@prisma/client";
@@ -23,6 +24,9 @@ export async function PATCH(
   request: NextRequest,
   context: { params: Promise<{ id: string }> },
 ) {
+  const csrfError = await verifySameOrigin(req);
+  if (csrfError) return csrfError;
+
   const adminError = await requireAdmin();
   if (adminError) return adminError;
 

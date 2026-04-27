@@ -1,3 +1,4 @@
+import { verifySameOrigin } from "@/lib/security/csrf";
 import { requireActiveStaff } from "@/lib/auth/staff";
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
@@ -27,6 +28,9 @@ export async function PATCH(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const csrfError = await verifySameOrigin(req);
+  if (csrfError) return csrfError;
+
   await requireActiveStaff();
 
   const { id: orderId } = await params;
