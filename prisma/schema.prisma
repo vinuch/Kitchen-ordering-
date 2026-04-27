@@ -199,3 +199,4 @@ model BotSession {
   @@index([telegramUserId])
 }
 
+

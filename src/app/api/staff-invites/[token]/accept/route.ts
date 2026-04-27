@@ -24,6 +24,19 @@ export async function POST(
     redirect("/join/invalid");
   }
 
+  const existingStaff = await prisma.staffUser.findFirst({
+    where: {
+      firstName: {
+        equals: name,
+        mode: "insensitive",
+      },
+    },
+  });
+
+  if (existingStaff) {
+    redirect(`/join/${token}?error=duplicate`);
+  }
+
   const staff = await prisma.staffUser.upsert({
     where: { telegramUserId: `web:${token}` },
     update: {
