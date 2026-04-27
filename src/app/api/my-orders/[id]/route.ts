@@ -2,6 +2,37 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { prisma } from "@/lib/prisma";
 
+export async function GET(
+  _req: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const cookieStore = await cookies();
+  const staffUserId = cookieStore.get("staff_user_id")?.value;
+
+  if (!staffUserId) {
+    return NextResponse.json({ ok: false, error: "Not logged in" }, { status: 401 });
+  }
+
+  const { id } = await params;
+
+  const order = await prisma.order.findFirst({
+    where: { id, staffUserId },
+    include: {
+      items: {
+        include: {
+          modifiers: true,
+        },
+      },
+    },
+  });
+
+  if (!order) {
+    return NextResponse.json({ ok: false, error: "Order not found" }, { status: 404 });
+  }
+
+  return NextResponse.json({ ok: true, order });
+}
+
 export async function PATCH(
   req: Request,
   { params }: { params: Promise<{ id: string }> }

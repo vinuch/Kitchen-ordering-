@@ -188,9 +188,14 @@ export default async function OrderDetailPage({
             </p>
           </div>
 
-          <Link href="/my-orders" className="rounded bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm">
-            ← My Orders
-          </Link>
+          <div className="flex gap-2">
+            <Link href={`/tg/order?editOrderId=${order.id}`} className="rounded bg-black px-4 py-2 text-sm font-semibold text-white">
+              Edit Items
+            </Link>
+            <Link href="/my-orders" className="rounded bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm">
+              ← My Orders
+            </Link>
+          </div>
         </div>
 
         <div className="mb-4 rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
