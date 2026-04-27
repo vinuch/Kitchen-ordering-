@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { cookies } from "next/headers";
+import { prisma } from "@/lib/prisma";
 import { createOrderFromCart } from "@/server/order/create-order-from-cart";
 import type { DraftOrderLineInput } from "@/server/order/types";
 import { verifyTelegram } from "@/lib/verifyTelegram";
@@ -121,15 +123,40 @@ export async function POST(req: Request) {
   try {
     const body = (await req.json()) as CreateOrderRequest;
 
-    if (!body.telegramUserId || !body.initData) {
-      return NextResponse.json({ ok: false }, { status: 400 });
-    }
+    const cookieStore = await cookies();
+    const staffUserIdFromCookie = cookieStore.get("staff_user_id")?.value;
 
-    if (!verifyTelegram(body.initData, process.env.TELEGRAM_BOT_TOKEN!)) {
-      return NextResponse.json({ ok: false }, { status: 401 });
-    }
+    let orderUser = {
+      telegramUserId: body.telegramUserId ?? "",
+      firstName: body.firstName ?? null,
+      lastName: body.lastName ?? null,
+      username: body.username ?? null,
+    };
 
-    if (!isAllowedTelegramUserId(body.telegramUserId)) {
+    if (body.telegramUserId && body.initData) {
+      if (!verifyTelegram(body.initData, process.env.TELEGRAM_BOT_TOKEN!)) {
+        return NextResponse.json({ ok: false }, { status: 401 });
+      }
+
+      if (!isAllowedTelegramUserId(body.telegramUserId)) {
+        return NextResponse.json({ ok: false, error: "Not authorized" }, { status: 403 });
+      }
+    } else if (staffUserIdFromCookie) {
+      const staffUser = await prisma.staffUser.findUnique({
+        where: { id: staffUserIdFromCookie },
+      });
+
+      if (!staffUser || !staffUser.isActive) {
+        return NextResponse.json({ ok: false, error: "Not authorized" }, { status: 403 });
+      }
+
+      orderUser = {
+        telegramUserId: staffUser.telegramUserId,
+        firstName: staffUser.firstName,
+        lastName: staffUser.lastName,
+        username: staffUser.username,
+      };
+    } else {
       return NextResponse.json({ ok: false, error: "Not authorized" }, { status: 403 });
     }
 
@@ -138,34 +165,34 @@ export async function POST(req: Request) {
     }
 
     const order = await createOrderFromCart({
-      telegramUserId: body.telegramUserId,
-      firstName: body.firstName ?? null,
-      lastName: body.lastName ?? null,
-      username: body.username ?? null,
+      telegramUserId: orderUser.telegramUserId,
+      firstName: orderUser.firstName ?? null,
+      lastName: orderUser.lastName ?? null,
+      username: orderUser.username ?? null,
       notes: body.notes ?? null,
       tableNumber: body.tableNumber ?? null,
       lines: body.lines,
     });
 
     const waiterMsg = buildWaiterMessage(order, {
-      firstName: body.firstName,
-      username: body.username,
+      firstName: orderUser.firstName,
+      username: orderUser.username,
     });
 
     const operatorMsg = buildOperatorMessage(order, {
-      firstName: body.firstName,
-      username: body.username,
+      firstName: orderUser.firstName,
+      username: orderUser.username,
     });
 
     const waiterChatId = body.telegramUserId;
-    const operatorChatId = process.env.OPERATOR_CHAT_ID;
-
-    await sendTelegramMessage(waiterChatId, waiterMsg);
-
     const operatorIds = (process.env.OPERATOR_CHAT_IDS ?? "")
       .split(",")
       .map((s) => s.trim())
       .filter(Boolean);
+
+    if (waiterChatId) {
+      await sendTelegramMessage(waiterChatId, waiterMsg);
+    }
 
     for (const opId of operatorIds) {
       await sendTelegramMessage(
