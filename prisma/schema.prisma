@@ -171,6 +171,20 @@ model OrderItemModifier {
   @@index([modifierOptionId])
 }
 
+
+model StaffInvite {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  role      String   @default("SERVER")
+  name      String?
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([token])
+  @@index([usedAt])
+}
+
 model BotSession {
   id             String          @id @default(cuid())
   telegramUserId String          @unique
