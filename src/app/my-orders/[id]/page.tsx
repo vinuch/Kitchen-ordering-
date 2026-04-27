@@ -177,6 +177,8 @@ export default async function OrderDetailPage({
     );
   }
 
+  const canEdit = order.paymentStatus !== "PAID";
+
   return (
     <main className="min-h-screen bg-[#f7f7f7] p-4 pb-24 text-black">
       <div className="mx-auto max-w-3xl">
@@ -189,9 +191,11 @@ export default async function OrderDetailPage({
           </div>
 
           <div className="flex gap-2">
-            <Link href={`/tg/order?editOrderId=${order.id}`} className="rounded bg-black px-4 py-2 text-sm font-semibold text-white">
-              Edit Items
-            </Link>
+            {canEdit ? (
+              <Link href={`/tg/order?editOrderId=${order.id}`} className="rounded bg-black px-4 py-2 text-sm font-semibold text-white">
+                Edit Items
+              </Link>
+            ) : null}
             <Link href="/my-orders" className="rounded bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm">
               ← My Orders
             </Link>
@@ -215,6 +219,7 @@ export default async function OrderDetailPage({
           </div>
         </div>
 
+        {canEdit ? (
         <form action={updateOrder} className="mb-4 rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
           <input type="hidden" name="orderId" value={order.id} />
 
@@ -237,7 +242,13 @@ export default async function OrderDetailPage({
             Save Changes
           </button>
         </form>
+        ) : (
+          <div className="mb-4 rounded-xl border border-gray-200 bg-white p-4 text-sm font-semibold text-gray-600 shadow-sm">
+            This order is paid and locked from editing.
+          </div>
+        )}
 
+        {canEdit ? (
         <form action={addItemToOrder} className="mb-4 rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
           <input type="hidden" name="orderId" value={order.id} />
 
@@ -270,6 +281,7 @@ export default async function OrderDetailPage({
             Add Item
           </button>
         </form>
+        ) : null}
 
         {order.paymentStatus !== "PAID" ? (
           <form action={markPaid} className="mb-4 rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
@@ -319,6 +331,7 @@ export default async function OrderDetailPage({
                   </div>
                 ) : null}
 
+                {canEdit ? (
                 <form action={removeItemFromOrder} className="mt-3">
                   <input type="hidden" name="orderId" value={order.id} />
                   <input type="hidden" name="orderItemId" value={item.id} />
@@ -326,6 +339,7 @@ export default async function OrderDetailPage({
                     Remove Item
                   </button>
                 </form>
+                ) : null}
               </div>
             ))}
           </div>
