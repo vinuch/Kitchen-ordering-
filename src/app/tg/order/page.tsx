@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState } from "react";
 import Script from "next/script";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
 
 import { MenuList } from "./_components/menu-list";
 import { MenuItemDetailPanel } from "./_components/menu-item-detail";
@@ -17,8 +16,11 @@ import type {
 import { getTelegramWebApp } from "./_components/telegram-webapp";
 
 export default function TelegramOrderPage() {
-  const searchParams = useSearchParams();
-  const editOrderId = searchParams.get("editOrderId");
+  const [editOrderId, setEditOrderId] = useState<string | null>(null);
+
+  useEffect(() => {
+    setEditOrderId(new URLSearchParams(window.location.search).get("editOrderId"));
+  }, []);
 
   const [items, setItems] = useState<MenuListItem[]>([]);
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
