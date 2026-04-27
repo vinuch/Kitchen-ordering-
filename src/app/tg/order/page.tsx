@@ -29,6 +29,7 @@ export default function TelegramOrderPage() {
   const [tableNumber, setTableNumber] = useState("");
   const [detailOpen, setDetailOpen] = useState(false);
   const [cartOpen, setCartOpen] = useState(false);
+  const [editOrderId, setEditOrderId] = useState<string | null>(null);
 
   const [telegramUser, setTelegramUser] = useState<{
     id: string;
@@ -37,6 +38,10 @@ export default function TelegramOrderPage() {
     username: string | null;
     initData: string;
   } | null>(null);
+
+  useEffect(() => {
+    setEditOrderId(new URLSearchParams(window.location.search).get("editOrderId"));
+  }, []);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -160,8 +165,8 @@ export default function TelegramOrderPage() {
       setSubmitting(true);
       setSubmitError(null);
 
-      const res = await fetch("/api/orders", {
-        method: "POST",
+      const res = await fetch(editOrderId ? `/api/orders/${editOrderId}/items` : "/api/orders", {
+        method: editOrderId ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           telegramUserId: telegramUser?.id,
@@ -183,11 +188,11 @@ export default function TelegramOrderPage() {
 
       const json = (await res.json()) as CreateOrderResponse;
 
-      if (!res.ok || !json.ok || !json.order) {
+      if (!res.ok || !json.ok) {
         throw new Error(json.error ?? "Failed to submit order");
       }
 
-      setSubmittedOrderNumber(json.order.orderNumber);
+      setSubmittedOrderNumber(editOrderId ? "updated" : json.order!.orderNumber);
       setCart([]);
       setTableNumber("");
       setCartOpen(false);
@@ -221,7 +226,7 @@ export default function TelegramOrderPage() {
       <div className="mx-auto max-w-7xl">
         <div className="mb-3 flex items-start justify-between gap-3">
           <div>
-            <h1 className="text-xl font-bold text-black">New Order</h1>
+            <h1 className="text-xl font-bold text-black">{editOrderId ? "Edit Order" : "New Order"}</h1>
             <p className="mt-0.5 text-xs text-gray-600">Fast order entry</p>
           </div>
 
