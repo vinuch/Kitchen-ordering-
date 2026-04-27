@@ -281,11 +281,11 @@ export default function TelegramOrderPage() {
           >
             ← My Orders
           </Link>
-          <div className="rounded-lg bg-white px-3 py-2 text-xs text-gray-500 shadow-sm">
-            {telegramUser
-              ? `${telegramUser.firstName ?? "Unknown"}${telegramUser.username ? ` (@${telegramUser.username})` : ""}`
-              : "Telegram user not detected"}
-          </div>
+          {telegramUser ? (
+            <div className="rounded-lg bg-white px-3 py-2 text-xs text-gray-500 shadow-sm">
+              {`${telegramUser.firstName ?? "Unknown"}${telegramUser.username ? ` (@${telegramUser.username})` : ""}`}
+            </div>
+          ) : null}
         </div>
 
         {submittedOrderNumber ? (
