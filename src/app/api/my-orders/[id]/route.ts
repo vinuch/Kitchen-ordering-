@@ -5,7 +5,7 @@ import { cookies } from "next/headers";
 import { prisma } from "@/lib/prisma";
 
 export async function GET(
-  _req: Request,
+  req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const cookieStore = await cookies();

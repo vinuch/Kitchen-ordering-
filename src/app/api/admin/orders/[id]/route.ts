@@ -24,7 +24,7 @@ export async function PATCH(
   request: NextRequest,
   context: { params: Promise<{ id: string }> },
 ) {
-  const csrfError = await verifySameOrigin(req);
+  const csrfError = await verifySameOrigin(request);
   if (csrfError) return csrfError;
 
   const adminError = await requireAdmin();
