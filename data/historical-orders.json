@@ -1,0 +1,54 @@
+[
+  {
+    "date": "2026-04-27",
+    "orders": [
+      { "item": "Okra + Egusi assorted + water", "amount": 4200 },
+      { "item": "Egusi goat meat + extra fufu", "amount": 4800 },
+      { "item": "Rice + Stew assorted", "amount": 4000 },
+      { "item": "Nsala assorted + extra semo", "amount": 5300 },
+      { "item": "Egusi assorted", "amount": 4000 },
+      { "item": "Egusi assorted", "amount": 4000 },
+      { "item": "Egusi assorted + extra fufu", "amount": 4300 },
+      { "item": "Egusi assorted + extra semo", "amount": 4800 },
+      { "item": "Heineken", "amount": 1500 },
+      { "item": "Okra assorted + extra semo", "amount": 4800 },
+      { "item": "Egusi assorted", "amount": 4000 },
+      { "item": "Egusi + Okra goat meat", "amount": 4500 },
+      { "item": "Nsala takeaway + extra semo", "amount": 5800 },
+      { "item": "Bitterleaf takeaway", "amount": 4500 },
+      { "item": "Ofe Akwu assorted", "amount": 4000 },
+      { "item": "Stew assorted", "amount": 4000 }
+    ]
+  },
+  {
+    "date": "2026-04-26",
+    "orders": [
+      { "item": "Rice + Stew dry fish takeaway", "amount": 6500 },
+      { "item": "Rice + Stew dry fish takeaway", "amount": 6500 },
+      { "item": "Rice + Stew titus fish takeaway", "amount": 4500 },
+      { "item": "Okra goat meat + extra semo", "amount": 5500 },
+      { "item": "Okra assorted + extra fufu", "amount": 4800 },
+      { "item": "Egusi goat meat + extra fufu", "amount": 5000 },
+      { "item": "Nsala goat meat", "amount": 4500 },
+      { "item": "Rice + Stew goat meat", "amount": 5200 },
+      { "item": "Nsala goat meat", "amount": 5000 },
+      { "item": "Rice + Stew assorted", "amount": 4000 },
+      { "item": "Okra assorted", "amount": 4800 },
+      { "item": "Egusi assorted + extra fufu", "amount": 4200 },
+      { "item": "Bitterleaf assorted + extra semo", "amount": 4300 }
+    ]
+  },
+  {
+    "date": "2026-04-25",
+    "orders": [
+      { "item": "Castle Lite x2", "amount": 2600 },
+      { "item": "Legend", "amount": 1500 },
+      { "item": "Coke", "amount": 500 },
+      { "item": "Water", "amount": 500 },
+      { "item": "Rice + Ofe Akwu dry fish", "amount": 4800 },
+      { "item": "Rice + Ofe Akwu", "amount": 4000 },
+      { "item": "Rice + Ofe Akwu takeaway", "amount": 6300 },
+      { "item": "Pepper Soup", "amount": 1200 }
+    ]
+  }
+]

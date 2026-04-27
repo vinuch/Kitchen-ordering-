@@ -1,3 +1,4 @@
+import { requireActiveStaff } from "@/lib/auth/staff";
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { prisma } from "@/lib/prisma";
@@ -37,6 +38,8 @@ export async function PATCH(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  await requireActiveStaff();
+
   const cookieStore = await cookies();
   const staffUserId = cookieStore.get("staff_user_id")?.value;
 

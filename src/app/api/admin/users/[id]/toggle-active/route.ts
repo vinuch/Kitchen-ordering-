@@ -1,3 +1,4 @@
+import { requireAdmin } from "@/lib/auth/admin";
 import { prisma } from "@/lib/prisma";
 import { redirect } from "next/navigation";
 
@@ -5,6 +6,9 @@ export async function POST(
   _req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const adminError = await requireAdmin();
+  if (adminError) return adminError;
+
   const { id } = await params;
 
   const user = await prisma.staffUser.findUnique({

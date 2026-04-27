@@ -1,3 +1,4 @@
+import { requireAdmin } from "@/lib/auth/admin";
 import { NextRequest, NextResponse } from "next/server";
 import { OrderStatus, PaymentStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
@@ -22,6 +23,9 @@ export async function PATCH(
   request: NextRequest,
   context: { params: Promise<{ id: string }> },
 ) {
+  const adminError = await requireAdmin();
+  if (adminError) return adminError;
+
   try {
     const { id } = await context.params;
     const body = (await request.json()) as UpdateOrderBody;
