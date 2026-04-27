@@ -178,6 +178,9 @@ model StaffInvite {
   role      String   @default("SERVER")
   name      String?
   usedAt    DateTime?
+  revokedAt DateTime?
+  expiresAt DateTime?
+  usedByStaffUserId String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

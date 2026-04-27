@@ -1,19 +1,18 @@
 import { prisma } from "@/lib/prisma";
-import { NextResponse } from "next/server";
+import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 
 export async function POST(
-  req: Request,
-  { params }: { params: { id: string } }
+  _req: Request,
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  await prisma.invite.update({
-    where: { id: params.id },
-    data: { isActive: false },
+  const { id } = await params;
+
+  await prisma.staffInvite.update({
+    where: { id },
+    data: { revokedAt: new Date() },
   });
 
   revalidatePath("/admin/invites");
-
-  return NextResponse.redirect(
-    new URL("/admin/invites", req.url)
-  );
+  redirect("/admin/invites");
 }

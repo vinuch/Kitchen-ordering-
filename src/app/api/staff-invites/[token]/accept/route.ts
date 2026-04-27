@@ -20,7 +20,7 @@ export async function POST(
     where: { token },
   });
 
-  if (!invite) {
+  if (!invite || invite.revokedAt || (invite.expiresAt && invite.expiresAt < new Date())) {
     redirect("/join/invalid");
   }
 
@@ -41,7 +41,10 @@ export async function POST(
 
   await prisma.staffInvite.update({
     where: { token },
-    data: { usedAt: new Date() },
+    data: {
+      usedAt: new Date(),
+      usedByStaffUserId: staff.id,
+    },
   });
 
   const cookieStore = await cookies();
