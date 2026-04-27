@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "next/navigation";
 import Script from "next/script";
 import Link from "next/link";
 import { MenuList } from "./_components/menu-list";
@@ -15,8 +14,12 @@ import type {
 import { getTelegramWebApp } from "./_components/telegram-webapp";
 
 export function TelegramOrderClient() {
-  const searchParams = useSearchParams();
-  const editOrderId = searchParams.get("editOrderId");
+  const [editOrderId, setEditOrderId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    setEditOrderId(params.get("editOrderId"));
+  }, []);
   const [items, setItems] = useState<MenuListItem[]>([]);
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [selectedItem, setSelectedItem] = useState<MenuItemDetail | null>(null);
