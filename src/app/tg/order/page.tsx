@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Script from "next/script";
+import Link from "next/link";
 import { MenuList } from "./_components/menu-list";
 import { MenuItemDetailPanel } from "./_components/menu-item-detail";
 import type {
@@ -223,6 +224,13 @@ export default function TelegramOrderPage() {
             <h1 className="text-xl font-bold text-black">New Order</h1>
             <p className="mt-0.5 text-xs text-gray-600">Fast order entry</p>
           </div>
+
+          <Link
+            href="/my-orders"
+            className="rounded-lg bg-white px-3 py-2 text-xs text-gray-700 shadow-sm"
+          >
+            ← My Orders
+          </Link>
           <div className="rounded-lg bg-white px-3 py-2 text-xs text-gray-500 shadow-sm">
             {telegramUser
               ? `${telegramUser.firstName ?? "Unknown"}${telegramUser.username ? ` (@${telegramUser.username})` : ""}`
