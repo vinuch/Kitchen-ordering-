@@ -2,7 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { CopyButton } from "./copy-button";
 
 export default async function AdminInvitesPage() {
-  const invites = await prisma.invite.findMany({
+  const invites = await prisma.staffInvite.findMany({
     orderBy: { createdAt: "desc" },
   });
 
