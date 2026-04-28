@@ -187,11 +187,8 @@ export default function TelegramOrderPage() {
   }, [cart]);
 
   async function handleSubmitOrder() {
-    if (!telegramUser?.id || !telegramUser.initData) {
-      setSubmitError("Join with an invite link before submitting an order");
-      return;
-    }
-
+    // Allow either Telegram Mini App auth OR web staff cookie auth.
+    // Backend verifies both; do not block web staff here.
     if (!tableNumber.trim()) {
       setSubmitError("Enter a table number");
       return;
