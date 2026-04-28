@@ -6,7 +6,13 @@ import Link from "next/link";
 export default async function AdminUsersPage() {
   const users = await prisma.staffUser.findMany({
     orderBy: { createdAt: "desc" },
-    include: {
+    select: {
+      id: true,
+      firstName: true,
+      telegramUserId: true,
+      staffCode: true,
+      isActive: true,
+      createdAt: true,
       orders: {
         orderBy: { createdAt: "desc" },
         take: 5,
@@ -68,7 +74,15 @@ export default async function AdminUsersPage() {
 
                 <div className="mt-3 rounded bg-gray-50 p-3 text-xs text-gray-600">
                   <div>ID: {user.id}</div>
-                  <div>Login key: {user.telegramUserId}</div>
+                  <div>
+                    Staff Code:{" "}
+                    <span className="font-mono font-bold text-black">
+                      {user.staffCode ?? "—"}
+                    </span>
+                  </div>
+                  <div className="break-all text-gray-400">
+                    Internal key: {user.telegramUserId}
+                  </div>
                 </div>
 
                 <div className="mt-3">
